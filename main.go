@@ -12,6 +12,9 @@ import (
 	"github.com/montanaflynn/stats"
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geojson"
+	"github.com/rosshemsley/kalman"
+	"github.com/rosshemsley/kalman/models"
+	"gonum.org/v1/gonum/mat"
 )
 
 const (
@@ -39,6 +42,54 @@ func main() {
 		log.Fatalln(err)
 	}
 }
+
+// func readStreamToMultiLineString(reader io.Reader) (*geojson.Feature, error) {
+// 	breader := bufio.NewReader(reader)
+//
+// 	mls := orb.MultiLineString{}
+// 	mlsf := geojson.NewFeature(mls)
+//
+// 	cursorName := ""
+// 	cursorActivity := ""
+// 	for {
+// 		read, err := breader.ReadBytes('\n')
+// 		if err != nil {
+// 			if errors.Is(err, os.ErrClosed) || errors.Is(err, io.EOF) {
+// 				break
+// 			}
+// 			log.Fatalln(err)
+// 		}
+//
+// 		pointFeature, err := geojson.UnmarshalFeature(read)
+// 		if err != nil {
+// 			log.Fatalln(err)
+// 		}
+//
+// 		cursorInit := cursorName == ""
+//
+// 		if cursorName != pointFeature.Properties["Name"].(string) {
+// 			cursorName = pointFeature.Properties["Name"].(string)
+// 			cursorActivity = pointFeature.Properties["Activity"].(string)
+//
+// 		}
+//
+// 		if cursorName == "" || cursorName != pointFeature.Properties["Name"].(string) {
+// 			cursorName = pointFeature.Properties["Name"].(string)
+// 			cursorActivity = pointFeature.Properties["Activity"].(string)
+//
+// 		} else if cursorActivity != pointFeature.Properties["Activity"].(string) {
+// 			cursorActivity = pointFeature.Properties["Activity"].(string)
+//
+// 		}
+//
+// 		err = multiLineStringAddPoint(mlsf, pointFeature)
+// 		if err != nil {
+// 			log.Fatalln(err)
+// 		}
+// 	}
+//
+// 	return mlsf, nil
+// }
 
 func readStreamToLineString(reader io.Reader) (*geojson.Feature, error) {
 	breader := bufio.NewReader(reader)
@@ -111,8 +162,20 @@ func lineStringAddPoint(ls *geojson.Feature, point *geojson.Feature) error {
 		ls.Properties["UUID"] = v
 	}
 
+	if _, ok := ls.Properties["Accuracies"]; ok {
+		ls.Properties["Accuracies"] = append(ls.Properties["Accuracies"].([]float64), point.Properties["Accuracy"].(float64))
+	} else {
+		ls.Properties["Accuracies"] = []float64{point.Properties["Accuracy"].(float64)}
+	}
+
 	// Bounded properties.
 	t := mustGetTime(point, "Time")
+
+	if _, ok := ls.Properties["UnixTimes"]; ok {
+		ls.Properties["UnixTimes"] = append(ls.Properties["UnixTimes"].([]int64), t.Unix())
+	} else {
+		ls.Properties["UnixTimes"] = []int64{t.Unix()}
+	}
 
 	lsStartTime := mustGetTime(ls, "StartTime")
 	if lsStartTime.IsZero() || t.Before(lsStartTime) {
@@ -206,4 +269,86 @@ func lineStringAddPoint(ls *geojson.Feature, point *geojson.Feature) error {
 	}
 
 	return nil
+}
+
+type Observation struct {
+	Time     time.Time
+	Point    mat.Vector
+	Accuracy float64
+}
+
+func NewObservation(secondsOffset float64, x, y, accuracy float64) Observation {
+	return Observation{
+		Point:    mat.NewVecDense(2, []float64{x, y}),
+		Time:     time.Time{}.Add(time.Duration(secondsOffset * float64(time.Second))),
+		Accuracy: accuracy,
+	}
+}
+
+func modifyKalman(ls *geojson.Feature) error {
+	/*
+		var t time.Time
+		values := []float64{1.3, 10.2, 5.0, 3.4}
+
+		model := models.NewSimpleModel(t, values[0], models.SimpleModelConfig{
+			InitialVariance:     1.0,
+			ProcessVariance:     1.0,
+			ObservationVariance: 2.0,
+		})
+		models.NewConstantVelocityModel(t, &mat.VecDense{}, models.ConstantVelocityModelConfig{
+			InitialVariance: 1.0,
+			ProcessVariance: 1.0,
+		})
+		filter := kalman.NewKalmanFilter(model)
+
+		for _, v := range values {
+			t = t.Add(time.Second)
+			filter.Update(t, model.NewMeasurement(v))
+			fmt.Printf("filtered value: %f\n", model.Value(filter.State()))
+		}
+	*/
+	if len(ls.Geometry.(orb.LineString)) < 2 {
+		return errors.New("line string must have at least two points")
+	}
+	observations := []Observation{}
+	for i, pt := range ls.Geometry.(orb.LineString) {
+		y := pt[0]
+		x := pt[1]
+		secondsOffset := ls.Properties["UnixTimes"].([]int64)[i]
+		accuracy := ls.Properties["Accuracies"].([]float64)[i] / earthCircumferenceDegreesPerMeter
+		observations = append(observations, NewObservation(float64(secondsOffset), x, y, accuracy))
+	}
+
+	model := models.NewConstantVelocityModel(observations[0].Time, observations[0].Point, models.ConstantVelocityModelConfig{
+		InitialVariance: 5 / earthCircumferenceDegreesPerMeter,
+		ProcessVariance: 5 / earthCircumferenceDegreesPerMeter / 2,
+	})
+
+	filteredTrajectory, err := kalmanFilter(model, observations)
+	if err != nil {
+		return err
+	}
+
+	for i, fpt := range filteredTrajectory {
+		ls.Geometry.(orb.LineString)[i][0] = fpt.AtVec(1) // y
+		ls.Geometry.(orb.LineString)[i][1] = fpt.AtVec(0) // x
+	}
+
+	return nil
+}
+
+func kalmanFilter(model *models.ConstantVelocityModel, observations []Observation) ([]mat.Vector, error) {
+	result := make([]mat.Vector, len(observations))
+	filter := kalman.NewKalmanFilter(model)
+
+	for i, obs := range observations {
+		err := filter.Update(obs.Time, model.NewPositionMeasurement(obs.Point, obs.Accuracy))
+		if err != nil {
+			return nil, err
+		}
+
+		result[i] = model.Position(filter.State())
+	}
+
+	return result, nil
 }

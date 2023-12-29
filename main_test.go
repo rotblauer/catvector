@@ -71,13 +71,16 @@ func TestReadStreamToLineString(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	lsSimpler := f.Geometry.(orb.LineString).Clone()
+
+	// Simplify
 	threshold := planar.Distance(orb.Point{0, 0}, orb.Point{0, 0.00006})
 	log.Printf("threshold: %f", threshold)
 	simplifier := simplify.DouglasPeucker(float64(6) * earthCircumferenceDegreesPerMeter)
-	f.Geometry = simplifier.Simplify(f.Geometry)
+	lsSimpler = simplifier.Simplify(lsSimpler).(orb.LineString)
 
 	// j, err := json.MarshalIndent(f, "", "  ")
-	j, err = json.Marshal(f)
+	j, err = json.Marshal(lsSimpler)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +91,22 @@ func TestReadStreamToLineString(t *testing.T) {
 	metersQ := earthCircumference * distance
 	t.Logf("metersQ: %f", metersQ)
 
-	if err := writeMap(f, filepath.Join(testdataRootPath, "output", "edge_simplified.png")); err != nil {
+	if err := writeMap(geojson.NewFeature(lsSimpler), filepath.Join(testdataRootPath, "output", "edge_simplified.png")); err != nil {
+		t.Fatal(err)
+	}
+
+	// KFilter
+
+	lsKalman := f.Geometry.(orb.LineString).Clone()
+	lsKalmanF := geojson.NewFeature(lsKalman)
+	for k, v := range f.Properties {
+		lsKalmanF.Properties[k] = v
+	}
+	if err := modifyKalman(lsKalmanF); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := writeMap(lsKalmanF, filepath.Join(testdataRootPath, "output", "edge_kalman.png")); err != nil {
 		t.Fatal(err)
 	}
 }
