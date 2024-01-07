@@ -51,7 +51,7 @@ func writeMap(f *geojson.Feature, pathto string) error {
 }
 
 func TestReadStreamToLineString(t *testing.T) {
-	in, err := testdataReader("edge.json")
+	in, err := testdataReader("edge2.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,11 +102,27 @@ func TestReadStreamToLineString(t *testing.T) {
 	for k, v := range f.Properties {
 		lsKalmanF.Properties[k] = v
 	}
-	if err := modifyKalman(lsKalmanF); err != nil {
+	if err := modifyLineStringKalman(lsKalmanF); err != nil {
 		t.Fatal(err)
 	}
 
 	if err := writeMap(lsKalmanF, filepath.Join(testdataRootPath, "output", "edge_kalman.png")); err != nil {
 		t.Fatal(err)
 	}
+
+	// KFilter - github.com/Regnull - geokalmanfilter
+
+	lsKalmanRegnull := f.Geometry.(orb.LineString).Clone()
+	lsKalmanRegnullF := geojson.NewFeature(lsKalmanRegnull)
+	for k, v := range f.Properties {
+		lsKalmanRegnullF.Properties[k] = v
+	}
+	if err := modifyLineStringKalmanRegnull(lsKalmanRegnullF); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := writeMap(lsKalmanRegnullF, filepath.Join(testdataRootPath, "output", "edge_kalman_regnull.png")); err != nil {
+		t.Fatal(err)
+	}
+
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"math"
@@ -12,6 +13,7 @@ import (
 	"github.com/montanaflynn/stats"
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geojson"
+	rkalman "github.com/regnull/kalman"
 	"github.com/rosshemsley/kalman"
 	"github.com/rosshemsley/kalman/models"
 	"gonum.org/v1/gonum/mat"
@@ -150,7 +152,8 @@ type floatStats struct {
 
 func lineStringAddPoint(ls *geojson.Feature, point *geojson.Feature) error {
 	_ls := ls.Geometry.(orb.LineString)
-	_ls = append(_ls, point.Point())
+	point6 := [2]float64{toFixed(point.Point()[0], 6), toFixed(point.Point()[1], 6)}
+	_ls = append(_ls, point6)
 	ls.Geometry = _ls
 
 	// Overwriting properties. 3
@@ -214,6 +217,12 @@ func lineStringAddPoint(ls *geojson.Feature, point *geojson.Feature) error {
 		ls.Properties["Speeds"] = []float64{toFixed(point.Properties["Speed"].(float64), 1)}
 	}
 
+	if _, ok := ls.Properties["Headings"]; ok {
+		ls.Properties["Headings"] = append(ls.Properties["Headings"].([]float64), toFixed(point.Properties["Heading"].(float64), 0))
+	} else {
+		ls.Properties["Headings"] = []float64{toFixed(point.Properties["Heading"].(float64), 0)}
+	}
+
 	min, err := stats.Min(ls.Properties["Elevations"].([]float64))
 	if err != nil {
 		return err
@@ -271,6 +280,9 @@ func lineStringAddPoint(ls *geojson.Feature, point *geojson.Feature) error {
 	return nil
 }
 
+/*
+"github.com/rosshemsley/kalman"
+*/
 type Observation struct {
 	Time     time.Time
 	Point    mat.Vector
@@ -285,28 +297,7 @@ func NewObservation(secondsOffset float64, x, y, accuracy float64) Observation {
 	}
 }
 
-func modifyKalman(ls *geojson.Feature) error {
-	/*
-		var t time.Time
-		values := []float64{1.3, 10.2, 5.0, 3.4}
-
-		model := models.NewSimpleModel(t, values[0], models.SimpleModelConfig{
-			InitialVariance:     1.0,
-			ProcessVariance:     1.0,
-			ObservationVariance: 2.0,
-		})
-		models.NewConstantVelocityModel(t, &mat.VecDense{}, models.ConstantVelocityModelConfig{
-			InitialVariance: 1.0,
-			ProcessVariance: 1.0,
-		})
-		filter := kalman.NewKalmanFilter(model)
-
-		for _, v := range values {
-			t = t.Add(time.Second)
-			filter.Update(t, model.NewMeasurement(v))
-			fmt.Printf("filtered value: %f\n", model.Value(filter.State()))
-		}
-	*/
+func modifyLineStringKalman(ls *geojson.Feature) error {
 	if len(ls.Geometry.(orb.LineString)) < 2 {
 		return errors.New("line string must have at least two points")
 	}
@@ -316,12 +307,14 @@ func modifyKalman(ls *geojson.Feature) error {
 		x := pt[1]
 		secondsOffset := ls.Properties["UnixTimes"].([]int64)[i]
 		accuracy := ls.Properties["Accuracies"].([]float64)[i] / earthCircumferenceDegreesPerMeter
-		observations = append(observations, NewObservation(float64(secondsOffset), x, y, accuracy))
+		variance := accuracy
+
+		observations = append(observations, NewObservation(float64(secondsOffset), x, y, variance))
 	}
 
 	model := models.NewConstantVelocityModel(observations[0].Time, observations[0].Point, models.ConstantVelocityModelConfig{
-		InitialVariance: 5 / earthCircumferenceDegreesPerMeter,
-		ProcessVariance: 5 / earthCircumferenceDegreesPerMeter / 2,
+		InitialVariance: observations[0].Accuracy,
+		ProcessVariance: observations[0].Accuracy / 2,
 	})
 
 	filteredTrajectory, err := kalmanFilter(model, observations)
@@ -351,4 +344,67 @@ func kalmanFilter(model *models.ConstantVelocityModel, observations []Observatio
 	}
 
 	return result, nil
+}
+
+/*
+"github.com/regnull/kalman"
+*/
+
+func modifyLineStringKalmanRegnull(ls *geojson.Feature) error {
+	if len(ls.Geometry.(orb.LineString)) < 2 {
+		return errors.New("line string must have at least two points")
+	}
+
+	// Estimate process noise.
+	processNoise := &rkalman.GeoProcessNoise{
+		// We assume the measurements will take place at the approximately the
+		// same location, so that we can disregard the earth's curvature.
+		BaseLat: ls.Geometry.(orb.LineString)[0][1],
+		// How much do we expect the user to move, meters per second.
+		DistancePerSecond: ls.Properties["Speeds"].([]float64)[0],
+		// How much do we expect the user's speed to change, meters per second squared.
+		SpeedPerSecond: math.Sqrt(ls.Properties["Speeds"].([]float64)[0]),
+	}
+	// Initialize Kalman filter.
+	filter, err := rkalman.NewGeoFilter(processNoise)
+	if err != nil {
+		fmt.Printf("failed to initialize Kalman filter: %s\n", err)
+		os.Exit(1)
+	}
+
+	lastTimeUnix := ls.Properties["UnixTimes"].([]int64)[0]
+
+	for i, pt := range ls.Geometry.(orb.LineString) {
+		x := pt[0]
+		y := pt[1]
+		// secondsOffset := ls.Properties["UnixTimes"].([]int64)[i]
+		// accuracy := ls.Properties["Accuracies"].([]float64)[i] / earthCircumferenceDegreesPerMeter
+		// variance := accuracy
+
+		td := float64(ls.Properties["UnixTimes"].([]int64)[i]) - float64(lastTimeUnix)
+		lastTimeUnix = ls.Properties["UnixTimes"].([]int64)[i]
+
+		log.Printf("lat %f, lng %f, speed %f, accuracy %f", y, x, ls.Properties["Speeds"].([]float64)[i], ls.Properties["Accuracies"].([]float64)[i])
+		obs := &rkalman.GeoObserved{
+			Lat:                y,
+			Lng:                x,
+			Altitude:           0,
+			Speed:              math.Max(0, ls.Properties["Speeds"].([]float64)[i]),
+			SpeedAccuracy:      math.Sqrt(math.Max(0, ls.Properties["Speeds"].([]float64)[i])),
+			Direction:          ls.Properties["Headings"].([]float64)[i],
+			DirectionAccuracy:  10,
+			HorizontalAccuracy: ls.Properties["Accuracies"].([]float64)[i] + 1,
+			VerticalAccuracy:   0.1,
+		}
+
+		if err := filter.Observe(td, obs); err != nil {
+			return fmt.Errorf("observation error: %w", err)
+		}
+
+		estimate := filter.Estimate()
+
+		ls.Geometry.(orb.LineString)[i][0] = estimate.Lng
+		ls.Geometry.(orb.LineString)[i][1] = estimate.Lat
+	}
+	return nil
 }

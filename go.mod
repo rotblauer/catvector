@@ -8,7 +8,9 @@ require (
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe
 	github.com/paulmach/orb v0.10.0
+	github.com/regnull/kalman v0.0.0-20200908141424-10753ec93999
 	github.com/rosshemsley/kalman v0.0.0-20190615074247-f4b900823fd1
+	gonum.org/v1/gonum v0.8.1
 )
 
 require (
@@ -19,5 +21,6 @@ require (
 	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d // indirect
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	gonum.org/v1/gonum v0.0.0-20190606121551-14af50e936aa // indirect
 )
+
+replace github.com/regnull/kalman => /home/ia/dev/regnull/kalman
