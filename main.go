@@ -58,6 +58,112 @@ func main() {
 	}
 }
 
+type RKalmanFilterT struct {
+	ProcessNoise *rkalman.GeoProcessNoise
+	Filter       *rkalman.GeoFilter
+	LastFeature  *geojson.Feature
+}
+
+func (f *RKalmanFilterT) InitFromPoint(obs *geojson.Feature) error {
+	f.LastFeature = obs
+	speed := math.Max(1, obs.Properties["Speed"].(float64))
+
+	// Estimate process noise.
+	f.ProcessNoise = &rkalman.GeoProcessNoise{
+		// We assume the measurements will take place at the approximately the
+		// same location, so that we can disregard the earth's curvature.
+		BaseLat: obs.Point().Lat(),
+		// How much do we expect the user to move, meters per second.
+		DistancePerSecond: speed, //  ls.Properties["Speeds"].([]float64)[0],
+		// How much do we expect the user's speed to change, meters per second squared.
+		SpeedPerSecond: math.Sqrt(speed),
+	}
+
+	// Initialize Kalman filter.
+	var err error
+	f.Filter, err = rkalman.NewGeoFilter(f.ProcessNoise)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (f *RKalmanFilterT) EstimateFromObservation(obs *geojson.Feature) (estimate *geojson.Feature, err error) {
+	if obs.Properties["Time"].(time.Time).Equal(f.LastFeature.Properties["Time"].(time.Time)) {
+		return obs, nil
+	}
+
+	timeDelta := obs.Properties["Time"].(time.Time).Sub(f.LastFeature.Properties["Time"].(time.Time))
+	if timeDelta.Seconds() < 0 {
+		return nil, fmt.Errorf("observation time is before last observation time")
+	}
+
+	o := &rkalman.GeoObserved{
+		Lat:                obs.Point().Lat(),
+		Lng:                obs.Point().Lon(),
+		Altitude:           obs.Properties["Elevation"].(float64),
+		Speed:              math.Max(0, obs.Properties["Speed"].(float64)),
+		SpeedAccuracy:      math.Sqrt(math.Max(0, obs.Properties["Speed"].(float64))),
+		Direction:          obs.Properties["Heading"].(float64),
+		DirectionAccuracy:  10,
+		HorizontalAccuracy: obs.Properties["Accuracy"].(float64) + 1,
+		VerticalAccuracy:   1,
+	}
+	err = f.Filter.Observe(timeDelta.Seconds(), o)
+	if err != nil {
+		return nil, fmt.Errorf("observation error: %w", err)
+	}
+
+	estimate = &geojson.Feature{} // necessary? or inited in sig?
+	*estimate = *obs
+	guess := f.Filter.Estimate()
+	estimate.Geometry = orb.Point{guess.Lng, guess.Lat}
+	estimate.Properties["Elevation"] = guess.Altitude
+	estimate.Properties["Speed"] = guess.Speed
+	estimate.Properties["Heading"] = guess.Direction
+	estimate.Properties["Accuracy"] = guess.HorizontalAccuracy
+
+	f.LastFeature = obs
+	return estimate, nil
+}
+
+func readStreamRKalmanFilter(reader io.Reader) (chan *geojson.Feature, chan error) {
+	featureChan := make(chan *geojson.Feature)
+	errChan := make(chan error)
+
+	filter := &RKalmanFilterT{}
+	breader := bufio.NewReader(reader)
+
+	go func() {
+		for {
+			read, err := breader.ReadBytes('\n')
+			if err != nil {
+				if errors.Is(err, os.ErrClosed) || errors.Is(err, io.EOF) {
+					return
+				}
+				log.Fatalln(err)
+			}
+			pointFeature, err := geojson.UnmarshalFeature(read)
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			if filter.Filter == nil {
+				filter.InitFromPoint(pointFeature)
+			}
+
+			estimate, err := filter.EstimateFromObservation(pointFeature)
+			if err != nil {
+				errChan <- err
+				continue
+			}
+			featureChan <- estimate
+		}
+	}()
+
+	return featureChan, errChan
+}
+
 func readStreamToLineString(reader io.Reader) (*geojson.Feature, error) {
 	breader := bufio.NewReader(reader)
 
