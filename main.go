@@ -1,3 +1,16 @@
+/*
+Package main is a program which takes a stream of geojson point features
+and outputs a single geojson feature, a linestring.
+The important logic is in its aggregations of point->linestring properties.
+
+Use:
+
+  zcat ~/tdata/edge.json.gz | tail -1000 | catvector
+
+Experimental logic is implemented for Kalman filtering and smoothing,
+trying out different libraries and parameters.
+*/
+
 package main
 
 import (
@@ -44,54 +57,6 @@ func main() {
 		log.Fatalln(err)
 	}
 }
-
-// func readStreamToMultiLineString(reader io.Reader) (*geojson.Feature, error) {
-// 	breader := bufio.NewReader(reader)
-//
-// 	mls := orb.MultiLineString{}
-// 	mlsf := geojson.NewFeature(mls)
-//
-// 	cursorName := ""
-// 	cursorActivity := ""
-// 	for {
-// 		read, err := breader.ReadBytes('\n')
-// 		if err != nil {
-// 			if errors.Is(err, os.ErrClosed) || errors.Is(err, io.EOF) {
-// 				break
-// 			}
-// 			log.Fatalln(err)
-// 		}
-//
-// 		pointFeature, err := geojson.UnmarshalFeature(read)
-// 		if err != nil {
-// 			log.Fatalln(err)
-// 		}
-//
-// 		cursorInit := cursorName == ""
-//
-// 		if cursorName != pointFeature.Properties["Name"].(string) {
-// 			cursorName = pointFeature.Properties["Name"].(string)
-// 			cursorActivity = pointFeature.Properties["Activity"].(string)
-//
-// 		}
-//
-// 		if cursorName == "" || cursorName != pointFeature.Properties["Name"].(string) {
-// 			cursorName = pointFeature.Properties["Name"].(string)
-// 			cursorActivity = pointFeature.Properties["Activity"].(string)
-//
-// 		} else if cursorActivity != pointFeature.Properties["Activity"].(string) {
-// 			cursorActivity = pointFeature.Properties["Activity"].(string)
-//
-// 		}
-//
-// 		err = multiLineStringAddPoint(mlsf, pointFeature)
-// 		if err != nil {
-// 			log.Fatalln(err)
-// 		}
-// 	}
-//
-// 	return mlsf, nil
-// }
 
 func readStreamToLineString(reader io.Reader) (*geojson.Feature, error) {
 	breader := bufio.NewReader(reader)

@@ -19,12 +19,13 @@ import (
 )
 
 var testdataRootPath = filepath.Join(".", "testdata")
+var testdataOutputRootPath = filepath.Join(testdataRootPath, "output")
 
 func testdataReader(geojsonFile string) (io.Reader, error) {
 	return os.Open(filepath.Join(testdataRootPath, geojsonFile))
 }
 
-func writeMap(f *geojson.Feature, pathto string) error {
+func paintMapWriting(f *geojson.Feature, pathto string) error {
 	ctx := sm.NewContext()
 	ctx.SetSize(800, 800)
 
@@ -67,7 +68,7 @@ func TestReadStreamToLineString(t *testing.T) {
 	}
 	log.Println(string(j))
 
-	if err := writeMap(f, filepath.Join(testdataRootPath, "output", "edge_original.png")); err != nil {
+	if err := paintMapWriting(f, filepath.Join(testdataOutputRootPath, "edge_original.png")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,7 +92,7 @@ func TestReadStreamToLineString(t *testing.T) {
 	metersQ := earthCircumference * distance
 	t.Logf("metersQ: %f", metersQ)
 
-	if err := writeMap(geojson.NewFeature(lsSimpler), filepath.Join(testdataRootPath, "output", "edge_simplified.png")); err != nil {
+	if err := paintMapWriting(geojson.NewFeature(lsSimpler), filepath.Join(testdataOutputRootPath, "edge_simplified.png")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,7 +107,7 @@ func TestReadStreamToLineString(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := writeMap(lsKalmanF, filepath.Join(testdataRootPath, "output", "edge_kalman.png")); err != nil {
+	if err := paintMapWriting(lsKalmanF, filepath.Join(testdataOutputRootPath, "edge_kalman.png")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -121,7 +122,7 @@ func TestReadStreamToLineString(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := writeMap(lsKalmanRegnullF, filepath.Join(testdataRootPath, "output", "edge_kalman_regnull.png")); err != nil {
+	if err := paintMapWriting(lsKalmanRegnullF, filepath.Join(testdataOutputRootPath, "edge_kalman_regnull.png")); err != nil {
 		t.Fatal(err)
 	}
 
