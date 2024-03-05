@@ -25,6 +25,61 @@ func readTestdataFile(geojsonFile string) (io.Reader, error) {
 	return os.Open(filepath.Join(testdataRootPath, geojsonFile))
 }
 
+func TestRKalmanFilter(t *testing.T) {
+	in, err := readTestdataFile("edge-rye-tail.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := sm.NewContext()
+	ctx.SetSize(2400, 2400*9/16)
+	originalColor := color.RGBA{0, 0, 255, 200}
+	kalmanColor := color.RGBA{255, 0, 0, 255}
+
+	filter := &RKalmanFilterT{}
+	kFeatureCh, errCh, closeCh := readStreamWithFeatureCallback(in, func(feature *geojson.Feature) (out *geojson.Feature, err error) {
+		if filter.Filter == nil {
+			if err := filter.InitFromPoint(feature); err != nilw {
+				t.Fatal(err)
+			}
+		}
+
+		original := sm.NewCircle(s2.LatLngFromDegrees(feature.Geometry.(orb.Point)[1], feature.Geometry.(orb.Point)[0]), originalColor, originalColor, 1, 0.5)
+		ctx.AddObject(original)
+
+		estimate, err := filter.EstimateFromObservation(feature)
+		if err != nil {
+			return nil, err
+		}
+		return estimate, nil
+	})
+
+loop:
+	for {
+		select {
+		case f := <-kFeatureCh:
+			estimated := sm.NewCircle(s2.LatLngFromDegrees(f.Geometry.(orb.Point)[1], f.Geometry.(orb.Point)[0]), kalmanColor, kalmanColor, 1, 0.5)
+			ctx.AddObject(estimated)
+
+		case e := <-errCh:
+			t.Logf("error: %v", e)
+		case <-closeCh:
+			break loop
+		}
+	}
+
+	img, err := ctx.Render()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(testdataOutputRootPath, 0777); err != nil {
+		t.Fatal(err)
+	}
+	if err := gg.SavePNG(filepath.Join(testdataOutputRootPath, "rye_edge_kalman_filter.png"), img); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func paintMapWriting(f *geojson.Feature, pathto string) error {
 	ctx := sm.NewContext()
 	ctx.SetSize(800, 800)

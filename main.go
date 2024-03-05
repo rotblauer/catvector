@@ -16,6 +16,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -25,7 +26,9 @@ import (
 
 	"github.com/montanaflynn/stats"
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/geo"
 	"github.com/paulmach/orb/geojson"
+	"github.com/paulmach/orb/simplify"
 	rkalman "github.com/regnull/kalman"
 	"github.com/rosshemsley/kalman"
 	"github.com/rosshemsley/kalman/models"
@@ -39,22 +42,240 @@ const (
 	earthCircumferenceDegreesPerMeter = 360 / earthCircumference
 )
 
-func main() {
-	lineStringFeature, err := readStreamToLineString(os.Stdin)
-	if err != nil {
-		log.Fatalln(err)
+func cmdRKalmanFilter() {
+	bwriter := bufio.NewWriter(os.Stdout)
+	featureCh, errCh, closeCh := readStreamRKalmanFilter(os.Stdin)
+
+loop:
+	for {
+		select {
+		case feature := <-featureCh:
+			j, err := feature.MarshalJSON()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			j = append(j, []byte("\n")...)
+			if _, err := bwriter.Write(j); err != nil {
+				log.Fatalln(err)
+			}
+		case err := <-errCh:
+			log.Println(err)
+		case <-closeCh:
+			break loop
+		}
 	}
 
-	bwriter := bufio.NewWriter(os.Stdout)
-	j, err := lineStringFeature.MarshalJSON()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if _, err := bwriter.Write(j); err != nil {
-		log.Fatalln(err)
-	}
 	if err := bwriter.Flush(); err != nil {
 		log.Fatalln(err)
+	}
+}
+
+type TrackerStateActivity int
+
+const (
+	TrackerStateUnknown TrackerStateActivity = iota
+	TrackerStateStationary
+	TrackerStateWalking
+	TrackerStateRunning
+	TrackerStateCycling
+	TrackerStateDriving
+)
+
+type TrackerState struct {
+	AverageSpeed float64
+	Activity     TrackerStateActivity
+}
+
+type Tracker struct {
+	Interval           time.Duration
+	State              TrackerState
+	intervalFeatures   []*geojson.Feature // points
+	LineStringFeatures []*geojson.Feature // linestrings
+}
+
+// calculatedAverageSpeedAbsolute returns the average speed in meters per second
+// between the first point and last. Round trips will theoretically return 0.
+func calculatedAverageSpeedAbsolute(pointFeatures []*geojson.Feature) float64 {
+	if len(pointFeatures) < 2 {
+		return 0
+	}
+	firstTime := mustGetTime(pointFeatures[0], "Time")
+	lastTime := mustGetTime(pointFeatures[len(pointFeatures)-1], "Time")
+	timeDelta := lastTime.Sub(firstTime).Seconds()
+	distance := geo.Distance(pointFeatures[0].Point(), pointFeatures[len(pointFeatures)-1].Point())
+
+	return distance / timeDelta
+}
+
+func averageReportedSpeed(pointFeatures []*geojson.Feature) float64 {
+	if len(pointFeatures) < 2 {
+		return pointFeatures[0].Properties["Speed"].(float64)
+	}
+	sum := 0.0
+	for _, f := range pointFeatures {
+		sum += f.Properties["Speed"].(float64)
+	}
+	return sum / float64(len(pointFeatures))
+}
+
+func timespan(pointFeatures []*geojson.Feature) time.Duration {
+	if len(pointFeatures) < 2 {
+		return 0
+	}
+	firstTime := mustGetTime(pointFeatures[0], "Time")
+	lastTime := mustGetTime(pointFeatures[len(pointFeatures)-1], "Time")
+	return lastTime.Sub(firstTime)
+}
+
+func (t *Tracker) AddPointFeatureToLastLinestring(f *geojson.Feature) {
+	ls := t.LineStringFeatures[len(t.LineStringFeatures)-1]
+	ls.Geometry = append(ls.Geometry.(orb.LineString), f.Point())
+	// TODO: update properties
+	ls.Properties["Duration"] = mustGetTime(f, "Time").Sub(mustGetTime(ls, "StartTime")).Round(time.Second).Seconds()
+	for k, v := range f.Properties {
+		ls.Properties[k] = v
+	}
+	t.LineStringFeatures[len(t.LineStringFeatures)-1] = ls
+}
+
+func (t *Tracker) AddPointFeatureToNewLinestring(f *geojson.Feature, optionalProps map[string]interface{}) {
+	newLineString := geojson.NewFeature(orb.LineString{f.Point()})
+	newLineString.Properties = f.Properties
+	newLineString.Properties["StartTime"] = f.Properties["Time"]
+	if optionalProps != nil {
+		for k, v := range optionalProps {
+			newLineString.Properties[k] = v
+		}
+	}
+	if t.LineStringFeatures == nil {
+		t.LineStringFeatures = []*geojson.Feature{}
+	}
+	t.LineStringFeatures = append(t.LineStringFeatures, newLineString)
+}
+
+func (t *Tracker) AddPointFeature(f *geojson.Feature) {
+	if t.intervalFeatures == nil {
+		t.intervalFeatures = []*geojson.Feature{}
+	}
+	if len(t.LineStringFeatures) == 0 {
+		t.intervalFeatures = append(t.intervalFeatures, f)
+		t.AddPointFeatureToNewLinestring(f, nil)
+		return
+	}
+
+	t.intervalFeatures = append(t.intervalFeatures, f)
+	for timespan(t.intervalFeatures) > t.Interval {
+		t.intervalFeatures = t.intervalFeatures[1:]
+	}
+
+	// This is the definition of discontinuity which drives the creation of new linestrings.
+	// TODO: check for activity change, etc.
+	// TODO: refine and define the thresholds better, probably
+	avgAbs := calculatedAverageSpeedAbsolute(t.intervalFeatures)
+	avgRep := averageReportedSpeed(t.intervalFeatures)
+	avgSpeed := (avgAbs + avgRep) / 2
+	// if avgSpeed > t.State.AverageSpeed*2 || avgSpeed < t.State.AverageSpeed*0.5 {
+	// 	// discontinuous
+	// 	t.State.AverageSpeed = avgSpeed
+	// 	t.AddPointFeatureToNewLinestring(f)
+	// } else {
+	// 	// continuous
+	// 	t.AddPointFeatureToLastLinestring(f)
+	// }
+
+	intervalIsMoving := avgSpeed > 0.5 // m/s -> 1.11847 mph
+	stateIsMoving := t.State.AverageSpeed > 0.5
+	if intervalIsMoving != stateIsMoving {
+		// discontinuous
+		t.State.AverageSpeed = avgSpeed
+		t.AddPointFeatureToNewLinestring(f, map[string]interface{}{"IsMoving": intervalIsMoving})
+	} else {
+		// continuous
+		t.AddPointFeatureToLastLinestring(f)
+	}
+}
+
+var flagTrackerInterval = flag.Duration("interval", 10*time.Second, "line detection interval")
+
+func cmdLineStrings() {
+	t := &Tracker{Interval: *flagTrackerInterval}
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
+		return f, nil
+	})
+loop:
+	for {
+		select {
+		case f := <-featureCh:
+			t.AddPointFeature(f)
+		case err := <-errCh:
+			log.Println(err)
+		case <-closeCh:
+			break loop
+		}
+	}
+	for _, ls := range t.LineStringFeatures {
+		j, err := ls.MarshalJSON()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		j = append(j, []byte("\n")...)
+		if _, err := os.Stdout.Write(j); err != nil {
+			log.Fatalln(err)
+		}
+	}
+}
+
+var flagDouglasPeuckerThreshold = flag.Float64("threshold", 0.0001, "Douglas-Peucker epsilon threshold")
+
+func cmdDouglasPeucker() {
+	log.Println("Douglas-Peucker simplification with threshold", *flagDouglasPeuckerThreshold)
+	simplifier := simplify.DouglasPeucker(*flagDouglasPeuckerThreshold)
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
+		// The feature must be a linestring feature.
+		if _, ok := f.Geometry.(orb.LineString); !ok {
+			return nil, errors.New("not a linestring")
+		}
+		ls := geojson.LineString(f.Geometry.(orb.LineString))
+		simplerGeometry := simplifier.Simplify(ls.Geometry())
+		f.Geometry = simplerGeometry
+		return f, nil
+	})
+loop:
+	for {
+		select {
+		case f := <-featureCh:
+			j, err := f.MarshalJSON()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			j = append(j, []byte("\n")...)
+			if _, err := os.Stdout.Write(j); err != nil {
+				log.Fatalln(err)
+			}
+		case err := <-errCh:
+			log.Println(err)
+		case <-closeCh:
+			break loop
+		}
+	}
+}
+
+func main() {
+
+	flag.Parse()
+	command := flag.Arg(0)
+	switch command {
+	case "rkalman":
+		cmdRKalmanFilter()
+		return
+	case "points-to-linestrings":
+		cmdLineStrings()
+		return
+	case "douglas-peucker":
+		cmdDouglasPeucker()
+		return
+	default:
+		log.Fatalf("unknown command: %s", command)
 	}
 }
 
@@ -89,13 +310,15 @@ func (f *RKalmanFilterT) InitFromPoint(obs *geojson.Feature) error {
 }
 
 func (f *RKalmanFilterT) EstimateFromObservation(obs *geojson.Feature) (estimate *geojson.Feature, err error) {
-	if obs.Properties["Time"].(time.Time).Equal(f.LastFeature.Properties["Time"].(time.Time)) {
+	t0, t1 := mustGetTime(f.LastFeature, "Time"), mustGetTime(obs, "Time")
+
+	if t0.Equal(t1) {
 		return obs, nil
 	}
 
-	timeDelta := obs.Properties["Time"].(time.Time).Sub(f.LastFeature.Properties["Time"].(time.Time))
+	timeDelta := t1.Sub(t0)
 	if timeDelta.Seconds() < 0 {
-		return nil, fmt.Errorf("observation time is before last observation time")
+		return nil, fmt.Errorf("observation time is before last observation time: %s < %s", t0.Format(time.RFC3339), t1.Format(time.RFC3339))
 	}
 
 	o := &rkalman.GeoObserved{
@@ -127,9 +350,10 @@ func (f *RKalmanFilterT) EstimateFromObservation(obs *geojson.Feature) (estimate
 	return estimate, nil
 }
 
-func readStreamRKalmanFilter(reader io.Reader) (chan *geojson.Feature, chan error) {
+func readStreamRKalmanFilter(reader io.Reader) (chan *geojson.Feature, chan error, chan struct{}) {
 	featureChan := make(chan *geojson.Feature)
 	errChan := make(chan error)
+	closeCh := make(chan struct{}, 1)
 
 	filter := &RKalmanFilterT{}
 	breader := bufio.NewReader(reader)
@@ -139,13 +363,14 @@ func readStreamRKalmanFilter(reader io.Reader) (chan *geojson.Feature, chan erro
 			read, err := breader.ReadBytes('\n')
 			if err != nil {
 				if errors.Is(err, os.ErrClosed) || errors.Is(err, io.EOF) {
+					closeCh <- struct{}{}
 					return
 				}
-				log.Fatalln(err)
+				errChan <- err
 			}
 			pointFeature, err := geojson.UnmarshalFeature(read)
 			if err != nil {
-				log.Fatalln(err)
+				errChan <- err
 			}
 
 			if filter.Filter == nil {
@@ -161,7 +386,41 @@ func readStreamRKalmanFilter(reader io.Reader) (chan *geojson.Feature, chan erro
 		}
 	}()
 
-	return featureChan, errChan
+	return featureChan, errChan, closeCh
+}
+
+func readStreamWithFeatureCallback(reader io.Reader, callback func(*geojson.Feature) (*geojson.Feature, error)) (chan *geojson.Feature, chan error, chan struct{}) {
+	featureChan := make(chan *geojson.Feature)
+	errChan := make(chan error)
+	closeCh := make(chan struct{}, 1)
+
+	breader := bufio.NewReader(reader)
+
+	go func() {
+		for {
+			read, err := breader.ReadBytes('\n')
+			if err != nil {
+				if errors.Is(err, os.ErrClosed) || errors.Is(err, io.EOF) {
+					closeCh <- struct{}{}
+					return
+				}
+				errChan <- err
+			}
+			pointFeature, err := geojson.UnmarshalFeature(read)
+			if err != nil {
+				errChan <- err
+			}
+
+			out, err := callback(pointFeature)
+			if err != nil {
+				errChan <- err
+				continue
+			}
+			featureChan <- out
+		}
+	}()
+
+	return featureChan, errChan, closeCh
 }
 
 func readStreamToLineString(reader io.Reader) (*geojson.Feature, error) {
