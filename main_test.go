@@ -21,7 +21,7 @@ import (
 var testdataRootPath = filepath.Join(".", "testdata")
 var testdataOutputRootPath = filepath.Join(testdataRootPath, "output")
 
-func testdataReader(geojsonFile string) (io.Reader, error) {
+func readTestdataFile(geojsonFile string) (io.Reader, error) {
 	return os.Open(filepath.Join(testdataRootPath, geojsonFile))
 }
 
@@ -52,7 +52,7 @@ func paintMapWriting(f *geojson.Feature, pathto string) error {
 }
 
 func TestReadStreamToLineString(t *testing.T) {
-	in, err := testdataReader("edge2.json")
+	in, err := readTestdataFile("edge2.json")
 	if err != nil {
 		t.Fatal(err)
 	}

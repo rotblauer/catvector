@@ -62,7 +62,7 @@ func readStreamToLineString(reader io.Reader) (*geojson.Feature, error) {
 	breader := bufio.NewReader(reader)
 
 	ls := orb.LineString{}
-	lsf := geojson.NewFeature(ls)
+	line := geojson.NewFeature(ls)
 
 	for {
 		read, err := breader.ReadBytes('\n')
@@ -78,13 +78,13 @@ func readStreamToLineString(reader io.Reader) (*geojson.Feature, error) {
 			log.Fatalln(err)
 		}
 
-		err = lineStringAddPoint(lsf, pointFeature)
+		err = lineStringAddPoint(line, pointFeature)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
 
-	return lsf, nil
+	return line, nil
 }
 
 func mustGetTime(f *geojson.Feature, key string) time.Time {
@@ -117,8 +117,8 @@ type floatStats struct {
 
 func lineStringAddPoint(ls *geojson.Feature, point *geojson.Feature) error {
 	_ls := ls.Geometry.(orb.LineString)
-	point6 := [2]float64{toFixed(point.Point()[0], 6), toFixed(point.Point()[1], 6)}
-	_ls = append(_ls, point6)
+	pointFixed6 := [2]float64{toFixed(point.Point()[0], 6), toFixed(point.Point()[1], 6)}
+	_ls = append(_ls, pointFixed6)
 	ls.Geometry = _ls
 
 	// Overwriting properties. 3
@@ -326,9 +326,9 @@ func modifyLineStringKalmanRegnull(ls *geojson.Feature) error {
 		// same location, so that we can disregard the earth's curvature.
 		BaseLat: ls.Geometry.(orb.LineString)[0][1],
 		// How much do we expect the user to move, meters per second.
-		DistancePerSecond: ls.Properties["Speeds"].([]float64)[0],
+		DistancePerSecond: 1, //  ls.Properties["Speeds"].([]float64)[0],
 		// How much do we expect the user's speed to change, meters per second squared.
-		SpeedPerSecond: math.Sqrt(ls.Properties["Speeds"].([]float64)[0]),
+		SpeedPerSecond: math.Sqrt(1),
 	}
 	// Initialize Kalman filter.
 	filter, err := rkalman.NewGeoFilter(processNoise)
@@ -337,7 +337,7 @@ func modifyLineStringKalmanRegnull(ls *geojson.Feature) error {
 		os.Exit(1)
 	}
 
-	lastTimeUnix := ls.Properties["UnixTimes"].([]int64)[0]
+	lastTimeUnix := ls.Properties["UnixTimes"].([]int64)[0] - 1
 
 	for i, pt := range ls.Geometry.(orb.LineString) {
 		x := pt[0]
@@ -353,13 +353,13 @@ func modifyLineStringKalmanRegnull(ls *geojson.Feature) error {
 		obs := &rkalman.GeoObserved{
 			Lat:                y,
 			Lng:                x,
-			Altitude:           0,
+			Altitude:           ls.Properties["Elevations"].([]float64)[i],
 			Speed:              math.Max(0, ls.Properties["Speeds"].([]float64)[i]),
 			SpeedAccuracy:      math.Sqrt(math.Max(0, ls.Properties["Speeds"].([]float64)[i])),
 			Direction:          ls.Properties["Headings"].([]float64)[i],
 			DirectionAccuracy:  10,
 			HorizontalAccuracy: ls.Properties["Accuracies"].([]float64)[i] + 1,
-			VerticalAccuracy:   0.1,
+			VerticalAccuracy:   1,
 		}
 
 		if err := filter.Observe(td, obs); err != nil {
