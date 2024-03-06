@@ -83,6 +83,7 @@ const (
 
 type TrackerState struct {
 	AverageSpeed float64
+	IsMoving     bool
 	Activity     TrackerStateActivity
 }
 
@@ -127,6 +128,20 @@ func timespan(pointFeatures []*geojson.Feature) time.Duration {
 	return lastTime.Sub(firstTime)
 }
 
+func distanceAbsolute(pointFeatures []*geojson.Feature) float64 {
+	if len(pointFeatures) < 2 {
+		return 0
+	}
+	return geo.Distance(pointFeatures[0].Point(), pointFeatures[len(pointFeatures)-1].Point())
+}
+
+func (t *Tracker) LastLinestring() *geojson.Feature {
+	if len(t.LineStringFeatures) == 0 {
+		return nil
+	}
+	return t.LineStringFeatures[len(t.LineStringFeatures)-1]
+}
+
 func (t *Tracker) AddPointFeatureToLastLinestring(f *geojson.Feature) {
 	ls := t.LineStringFeatures[len(t.LineStringFeatures)-1]
 	ls.Geometry = append(ls.Geometry.(orb.LineString), f.Point())
@@ -138,15 +153,13 @@ func (t *Tracker) AddPointFeatureToLastLinestring(f *geojson.Feature) {
 	t.LineStringFeatures[len(t.LineStringFeatures)-1] = ls
 }
 
-func (t *Tracker) AddPointFeatureToNewLinestring(f *geojson.Feature, optionalProps map[string]interface{}) {
+func (t *Tracker) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 	newLineString := geojson.NewFeature(orb.LineString{f.Point()})
 	newLineString.Properties = f.Properties
 	newLineString.Properties["StartTime"] = f.Properties["Time"]
-	if optionalProps != nil {
-		for k, v := range optionalProps {
-			newLineString.Properties[k] = v
-		}
-	}
+	newLineString.Properties["Duration"] = 0.0
+	newLineString.Properties["IsMoving"] = t.State.IsMoving
+
 	if t.LineStringFeatures == nil {
 		t.LineStringFeatures = []*geojson.Feature{}
 	}
@@ -159,7 +172,7 @@ func (t *Tracker) AddPointFeature(f *geojson.Feature) {
 	}
 	if len(t.LineStringFeatures) == 0 {
 		t.intervalFeatures = append(t.intervalFeatures, f)
-		t.AddPointFeatureToNewLinestring(f, nil)
+		t.AddPointFeatureToNewLinestring(f)
 		return
 	}
 
@@ -168,13 +181,24 @@ func (t *Tracker) AddPointFeature(f *geojson.Feature) {
 		t.intervalFeatures = t.intervalFeatures[1:]
 	}
 
-	// This is the definition of discontinuity which drives the creation of new linestrings.
-	// TODO: check for activity change, etc.
-	// TODO: refine and define the thresholds better, probably
-	avgAbs := calculatedAverageSpeedAbsolute(t.intervalFeatures)
-	avgRep := averageReportedSpeed(t.intervalFeatures)
-	avgSpeed := (avgAbs + avgRep) / 2
-	// if avgSpeed > t.State.AverageSpeed*2 || avgSpeed < t.State.AverageSpeed*0.5 {
+	// // This is the definition of discontinuity which drives the creation of new linestrings.
+	// // TODO: check for activity change, etc.
+	// // TODO: refine and define the thresholds better, probably
+	// avgAbs := calculatedAverageSpeedAbsolute(t.intervalFeatures)
+	// avgRep := averageReportedSpeed(t.intervalFeatures)
+	// avgSpeed := (avgAbs + avgRep) / 2
+	// // if avgSpeed > t.State.AverageSpeed*2 || avgSpeed < t.State.AverageSpeed*0.5 {
+	// // 	// discontinuous
+	// // 	t.State.AverageSpeed = avgSpeed
+	// // 	t.AddPointFeatureToNewLinestring(f)
+	// // } else {
+	// // 	// continuous
+	// // 	t.AddPointFeatureToLastLinestring(f)
+	// // }
+	//
+	// intervalIsMoving := avgSpeed > 0.5 // m/s -> 1.11847 mph
+	// stateIsMoving := t.State.AverageSpeed > 0.5
+	// if intervalIsMoving != stateIsMoving && t.LastLinestring().Properties["Duration"].(float64) > flagTrackerInterval.Seconds() {
 	// 	// discontinuous
 	// 	t.State.AverageSpeed = avgSpeed
 	// 	t.AddPointFeatureToNewLinestring(f)
@@ -183,14 +207,15 @@ func (t *Tracker) AddPointFeature(f *geojson.Feature) {
 	// 	t.AddPointFeatureToLastLinestring(f)
 	// }
 
-	intervalIsMoving := avgSpeed > 0.5 // m/s -> 1.11847 mph
-	stateIsMoving := t.State.AverageSpeed > 0.5
-	if intervalIsMoving != stateIsMoving {
-		// discontinuous
-		t.State.AverageSpeed = avgSpeed
-		t.AddPointFeatureToNewLinestring(f, map[string]interface{}{"IsMoving": intervalIsMoving})
+	dist := distanceAbsolute(t.intervalFeatures)
+	// 0.8 here becomes m/s -> 1.11847 mph
+	// METERS > 0.8 * 30s = 24m
+	intervalIsMoving := dist > 0.8*flagTrackerInterval.Seconds()
+
+	if intervalIsMoving != t.State.IsMoving {
+		t.State.IsMoving = intervalIsMoving
+		t.AddPointFeatureToNewLinestring(f)
 	} else {
-		// continuous
 		t.AddPointFeatureToLastLinestring(f)
 	}
 }
