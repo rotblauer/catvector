@@ -35,6 +35,10 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
+func init() {
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
+}
+
 const (
 	earthRadius                       = 6378137.0 // meters
 	earthCircumference                = math.Pi * earthRadius * 2
@@ -222,7 +226,7 @@ func (t *Tracker) AddPointFeature(f *geojson.Feature) {
 
 var flagTrackerInterval = flag.Duration("interval", 10*time.Second, "line detection interval")
 
-func cmdLineStrings() {
+func cmdPointsToLineStrings() {
 	t := &Tracker{Interval: *flagTrackerInterval}
 	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
 		return f, nil
@@ -246,6 +250,33 @@ loop:
 		j = append(j, []byte("\n")...)
 		if _, err := os.Stdout.Write(j); err != nil {
 			log.Fatalln(err)
+		}
+	}
+}
+
+func cmdLinestringsToPoints() {
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
+		return f, nil
+	})
+loop:
+	for {
+		select {
+		case f := <-featureCh:
+			center := f.Geometry.(orb.LineString).Bound().Center()
+			point := geojson.NewFeature(orb.Point(center))
+			point.Properties = f.Properties
+			j, err := point.MarshalJSON()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			j = append(j, []byte("\n")...)
+			if _, err := os.Stdout.Write(j); err != nil {
+				log.Fatalln(err)
+			}
+		case err := <-errCh:
+			log.Println(err)
+		case <-closeCh:
+			break loop
 		}
 	}
 }
@@ -294,7 +325,10 @@ func main() {
 		cmdRKalmanFilter()
 		return
 	case "points-to-linestrings":
-		cmdLineStrings()
+		cmdPointsToLineStrings()
+		return
+	case "linestrings-to-points":
+		cmdLinestringsToPoints()
 		return
 	case "douglas-peucker":
 		cmdDouglasPeucker()
@@ -334,16 +368,22 @@ func (f *RKalmanFilterT) InitFromPoint(obs *geojson.Feature) error {
 	return nil
 }
 
-func (f *RKalmanFilterT) EstimateFromObservation(obs *geojson.Feature) (estimate *geojson.Feature, err error) {
+func (f *RKalmanFilterT) EstimateFromObservation(obs *geojson.Feature) (estimatedFeature *geojson.Feature, err error) {
 	t0, t1 := mustGetTime(f.LastFeature, "Time"), mustGetTime(obs, "Time")
+	defer func() {
+		f.LastFeature = obs
+	}()
 
 	if t0.Equal(t1) {
 		return obs, nil
 	}
+	if t1.Before(t0) {
+		return obs, fmt.Errorf("observation time is before last observation time: last=%s current=%s", t0.Format(time.RFC3339), t1.Format(time.RFC3339))
 
+	}
 	timeDelta := t1.Sub(t0)
-	if timeDelta.Seconds() < 0 {
-		return nil, fmt.Errorf("observation time is before last observation time: %s < %s", t0.Format(time.RFC3339), t1.Format(time.RFC3339))
+	if timeDelta.Seconds() < 1 {
+		return obs, nil
 	}
 
 	o := &rkalman.GeoObserved{
@@ -362,17 +402,20 @@ func (f *RKalmanFilterT) EstimateFromObservation(obs *geojson.Feature) (estimate
 		return nil, fmt.Errorf("observation error: %w", err)
 	}
 
-	estimate = &geojson.Feature{} // necessary? or inited in sig?
-	*estimate = *obs
-	guess := f.Filter.Estimate()
-	estimate.Geometry = orb.Point{guess.Lng, guess.Lat}
-	estimate.Properties["Elevation"] = guess.Altitude
-	estimate.Properties["Speed"] = guess.Speed
-	estimate.Properties["Heading"] = guess.Direction
-	estimate.Properties["Accuracy"] = guess.HorizontalAccuracy
+	estimatedFeature = &geojson.Feature{} // necessary? or inited in sig?
 
-	f.LastFeature = obs
-	return estimate, nil
+	// The estimate value is copied from the observation.
+	*estimatedFeature = *obs
+
+	// The geometry alone is updated with the estimate.
+	filterEstimate := f.Filter.Estimate()
+	estimatedFeature.Geometry = orb.Point{filterEstimate.Lng, filterEstimate.Lat}
+	// estimatedFeature.Properties["Elevation"] = filterEstimate.Altitude
+	// estimatedFeature.Properties["Speed"] = filterEstimate.Speed
+	// estimatedFeature.Properties["Heading"] = filterEstimate.Direction
+	// estimatedFeature.Properties["Accuracy"] = filterEstimate.HorizontalAccuracy
+
+	return estimatedFeature, nil
 }
 
 func readStreamRKalmanFilter(reader io.Reader) (chan *geojson.Feature, chan error, chan struct{}) {
@@ -434,6 +477,9 @@ func readStreamWithFeatureCallback(reader io.Reader, callback func(*geojson.Feat
 			pointFeature, err := geojson.UnmarshalFeature(read)
 			if err != nil {
 				errChan <- err
+			}
+			if pointFeature == nil {
+				continue
 			}
 
 			out, err := callback(pointFeature)
