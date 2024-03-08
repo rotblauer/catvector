@@ -22547,3 +22547,11 @@ Processing category: rye, batch: 0387
 2024/03/08 10:37:24 main.go:322: Douglas-Peucker simplification with threshold 8e-05
 Processing category: rye, batch: 0388
 2024/03/08 10:37:32 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0390
+2024/03/08 10:37:45 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0389
+2024/03/08 10:37:43 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0391
+2024/03/08 10:37:49 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0392
+2024/03/08 10:38:03 main.go:322: Douglas-Peucker simplification with threshold 8e-05

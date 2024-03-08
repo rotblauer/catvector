@@ -1,3 +1,4 @@
 
 testdata/*.json
 testdata/*.json.gz
+*.out
