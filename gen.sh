@@ -3,111 +3,120 @@
 # set -x
 set -e
 
-# CAT_ONE
-CAT_ONE="${1:-rye}"
+export PARALLEL_BATCH_SIZE=${PARALLEL_BATCH_SIZE:-500000}
 
-# TRACKS_SOURCE is the source of the tracks data. It can be a file, and should be a .json.gz.
-TRACKS_SOURCE_GZ="${TRACKS_SOURCE_GZ:-$HOME/tdata/edge.json.gz}"
+#######################################
+# This function takes a directory path as its first argument and writes to temporary files in that directory.
+# Temporary files are useful to avoid gzip compression issues when running in parallel.
+# These temporary files can then be cat'ed together on completion.
+# Arguments:
+#   1  The directory path to write temporary files to.
+#######################################
+intermediary_gzipping_tmp() {
+  local TMPDIR="${1}"
+  mkdir -p "${TMPDIR}"
 
-# OUTPUT_ROOT is the root directory where the generated data will be stored.
-OUTPUT_ROOT="${OUTPUT_ROOT:-$HOME/tdata/local/catvector/gen}"
-# If any output data already exists it will be nuked to avoid dirty or unreproducible output.
-rm -rf "${OUTPUT_ROOT}"
-mkdir -p "${OUTPUT_ROOT}"
-
-# OUTPUT_REFERENCE is a copy of the refence file used to originate the data.
-# Create a copy of the edge.json.gz file if it doesn't exist.
-# It is important to keep and use a copy of the original source data
-# to ensure that the pipeline's output is reproducible.
-OUTPUT_REFERENCE="${OUTPUT_REFERENCE:-$OUTPUT_ROOT/reference/$(basename ${TRACKS_SOURCE_GZ})}"
-mkdir -p "$(dirname ${OUTPUT_REFERENCE})"
-[[ -f "${OUTPUT_REFERENCE}" ]] || cp "${TRACKS_SOURCE_GZ}" "${OUTPUT_REFERENCE}"
-
-# Build the go program to avoid having to that repeatedly.
-BUILD_TARGET=./build/bin/catvector
-mkdir -p "$(dirname ${BUILD_TARGET})"
-go build -o "${BUILD_TARGET}" ./main.go
-export BUILD_TARGET
-
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-
-intermediary_gzipping() {
-    # This function takes a directory path as its first argument and writes to temporary files in that directory.
-    # Temporary files are useful to avoid gzip compression issues when running in parallel.
-    # These temporary files can then be cat'ed together on completion.
-    local outroot="${1}"
-    local TMPDIR="${outroot}"
-    mkdir -p "${outroot}"
-
-#     mkdir -p "${1}"
-#     local out_ndjson=""
-#     local out_fc=""
-    tee >(gzip > "$(mktemp -t tmp-XXXXXXXXXX.ndjson.gz)")
-#     | tee >(ndgeojson2geojsonfc | gzip > "$(mktemp -t tmp-XXXXXXXXXX.fc.json.gz)")
-
-#     | tee "${1}.ndjson" \
-#     | tee >(ndgeojson2geojsonfc > "${1}.fc.json")
+  tee >(gzip >"$(mktemp -t tmp-XXXXXXXXXX.ndjson.gz)")
+  #     | tee >(ndgeojson2geojsonfc | gzip > "$(mktemp -t tmp-XXXXXXXXXX.fc.json.gz)")
+  #     | tee "${1}.ndjson" \
+  #     | tee >(ndgeojson2geojsonfc > "${1}.fc.json")
 }
-export -f intermediary_gzipping
+export -f intermediary_gzipping_tmp
 
+#######################################
+# Tees the input to a gzip file and the output.
+# Arguments:
+#   1 - the gzip file to which to write the input, gzipped
+#######################################
+intermediary_gzipping_to() {
+  local out_file="${1}"
+  mkdir -p "$(dirname "${out_file}")"
+
+  tee >(gzip >"${out_file}")
+  #     | tee >(ndgeojson2geojsonfc | gzip > "$(mktemp -t tmp-XXXXXXXXXX.fc.json.gz)")
+  #     | tee "${1}.ndjson" \
+  #     | tee >(ndgeojson2geojsonfc > "${1}.fc.json")
+}
+export -f intermediary_gzipping_to
+
+#######################################
+# process the parallelized data, per cat.
+# Globals:
+#   BUILD_TARGET
+#   CAT_ONE
+#   OUTPUT_ROOT_CAT_ONE
+# Arguments:
+#  None
+#######################################
 process() {
-    local ONECAT="${1}"
-    local OUTPUT_ROOT_ONECAT="${2}"
-    >&2 echo "Processing category: ${ONECAT}"
-    cattracks-names modify \
-    | gfilter --match-all '#(properties.Name=='"${ONECAT}"')' \
-    | ${BUILD_TARGET} rkalman \
+  #     | ${BUILD_TARGET} rkalman \
+  local batch_id
+  printf -v batch_id "%04d" "${1}"
+  [[ -z "${CAT_ONE}" ]] && echo "CAT_ONE is not set" && exit 1
+  [[ -z "${OUTPUT_ROOT_CAT_ONE}" ]] && echo "OUTPUT_ROOT_CAT_ONE is not set" && exit 1
+  [[ -z "${BUILD_TARGET}" ]] && echo "BUILD_TARGET is not set" && exit 1
+
+  local completed_file
+  completed_file="${OUTPUT_ROOT_CAT_ONE}/completed/batch-${batch_id}.txt"
+  if [[ -f "${completed_file}" ]]; then
+    echo >&2 "Skipping batch ${batch_id}. File exists: ${completed_file}"
+    return
+  fi
+
+  echo >&2 "Processing category: ${CAT_ONE}, batch: ${batch_id}"
+  ${BUILD_TARGET} validate \
+    | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
+    | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
+    | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
     | ${BUILD_TARGET} --interval=30s points-to-linestrings \
     | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
-    | tee >( \
-        gfilter --match-all "#(properties.IsMoving==true),#(properties.Duration>30)" \
-        | intermediary_gzipping "${OUTPUT_ROOT_ONECAT}/rkalman-linestrings-dp-moving" \
-        | tee >(${SCRIPT_DIR}/runt.sh "${OUTPUT_ROOT_ONECAT}/laps.mbtiles" laps) \
-        ) \
-    | tee >( \
-        gfilter --match-all "#(properties.IsMoving==false)" \
+    | tee >(
+      gfilter --match-all "#(properties.IsMoving==true),#(properties.Duration>30)" \
+        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
+    ) \
+    | tee >(
+      gfilter --match-all "#(properties.IsMoving==false)" \
         | $BUILD_TARGET linestrings-to-points \
-        | intermediary_gzipping "${OUTPUT_ROOT_ONECAT}/points-stationary" \
-        | tee >(${SCRIPT_DIR}/runt.sh "${OUTPUT_ROOT_ONECAT}/naps.mbtiles" naps) \
-        ) \
+        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz"
+    )
 
-
+    mkdir -p "$(dirname "${completed_file}")" && date > "${completed_file}"
 }
 export -f process
 
-percat() {
-    local ONECAT="${1}"
-    local OUTPUT_ROOT_ONECAT="${2}"
-    parallel -j 6 --pipe -L 500000 process "${ONECAT}" "${OUTPUT_ROOT_ONECAT}" \
-    > /dev/null
-
-#     for d in "$(find ${OUTPUT_ROOT_ONECAT} -type d)"; do
-#         # Concatenate the temporary files together.
-#         cat "${d}"/*.ndjson.gz > "${d}.ndjson.gz"
-#         cat "${d}"/*.fc.json.gz > "${d}.fc.json.gz"
-#         # And remove the original temporary files.
-#         rm -rf "${d}/tmp-*"
-#     done
-#
-#     echo "----------------"
-#     echo "CATEGORY: ${ONECAT}"
-#     echo "MOVING:"
-#     echo "Feature count: $(zcat ${OUTPUT_ROOT_ONECAT}/rkalman-linestrings-dp-moving.ndjson.gz | wc -l)"
-#     echo -n "Seconds: "
-#     zcat ${OUTPUT_ROOT_ONECAT}/rkalman-linestrings-dp-moving.ndjson.gz | while read -r line; do jj 'properties.Duration' <<< $line ; done | awk '{s+=$1} END {print s}'
-#     echo "STATIONARY:"
-#     echo "Feature count: $(zcat ${OUTPUT_ROOT_ONECAT}/rkalman-linestrings-dp-stationary.ndjson.gz | wc -l)"
-#     echo -n "Seconds: "
-#     zcat ${OUTPUT_ROOT_ONECAT}/rkalman-linestrings-dp-stationary.ndjson.gz | while read -r line; do jj 'properties.Duration' <<< $line ; done | awk '{s+=$1} END {print s}'
+#######################################
+# description
+# Arguments:
+#  None
+#######################################
+onecat() {
+  parallel -j 6 --pipe -L "${PARALLEL_BATCH_SIZE}" process {#} \
+    >/dev/null
 }
 
-run() {
-    OUTPUT_ROOT_CAT_ONE="${OUTPUT_ROOT}/${CAT_ONE}" # eg. <OUTPUT_ROOT>/rye
-    mkdir -p "${OUTPUT_ROOT_CAT_ONE}"
-    percat "${CAT_ONE}" "${OUTPUT_ROOT_CAT_ONE}"
-}
+#######################################
+# description
+# Globals:
+#   BASH_SOURCE
+#   CAT_ONE
+#   OUTPUT_REFERENCE
+#   OUTPUT_ROOT_CAT_ONE
+# Arguments:
+#  None
+#######################################
+main() {
+  local script_dir
+  script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+  source "${script_dir}/setup.sh"
 
-run
+  # Skip any existing output.
+#  [[ -d "${OUTPUT_ROOT_CAT_ONE}" ]] && echo "OUTPUT_ROOT_CAT_ONE already exists: ${OUTPUT_ROOT_CAT_ONE}" && exit 0
+
+  mkdir -p "${OUTPUT_ROOT_CAT_ONE}"
+  zcat "${OUTPUT_REFERENCE}" | onecat
+}
+main
 
 # cattracks explorer
 # http://localhost:8080/public/?geojson=http://localhost:8000/rye/reference.fc.json,http://localhost:8000/rye/rkalman-linestrings-dp-stationary.fc.json
+# http://localhost:8080/public/?vector=http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf

@@ -1,0 +1,78 @@
+Running CAT_ONE=ia
+Postprocessing category: ia
+cat: '/home/ia/tdata/local/catvector/gen/ia/linestrings/*.ndjson.gz': No such file or directory
++ OUTPUT_FILE=/home/ia/tdata/local/catvector/gen/ia/laps.mbtiles
+++ basename /home/ia/tdata/local/catvector/gen/ia/laps.mbtiles .mbtiles
++ TILESET_NAME=laps
+++ basename /home/ia/tdata/local/catvector/gen/ia/laps.mbtiles .mbtiles
++ LAYER_NAME=laps
++ tippeargs=(--maximum-tile-bytes 500000 --drop-smallest-as-needed --drop-densest-as-needed --minimum-zoom 3 --maximum-zoom 15 --include Name --include Time --include Duration --include StartTime --include UnixTime --include Activity --single-precision --read-parallel -l ${LAYER_NAME} -n ${TILESET_NAME} --temporary-directory "/tmp" -o ${OUTPUT_FILE} --force)
++ main
+++ dirname /home/ia/tdata/local/catvector/gen/ia/laps.mbtiles
++ mkdir -p /home/ia/tdata/local/catvector/gen/ia
++ tippecanoe --maximum-tile-bytes 500000 --drop-smallest-as-needed --drop-densest-as-needed --minimum-zoom 3 --maximum-zoom 15 --include Name --include Time --include Duration --include StartTime --include UnixTime --include Activity --single-precision --read-parallel -l laps -n laps --temporary-directory /tmp -o /home/ia/tdata/local/catvector/gen/ia/laps.mbtiles --force
+                              Merging string pool           Merging vertices              Merging nodes                 Merging index                 0 features, 4 bytes of geometry and attributes, 0 bytes of string pool, 0 bytes of vertices, 0 bytes of nodes
+Did not read any valid geometries
+cat: '/home/ia/tdata/local/catvector/gen/ia/points/*.ndjson.gz': No such file or directory
++ OUTPUT_FILE=/home/ia/tdata/local/catvector/gen/ia/naps.mbtiles
+++ basename /home/ia/tdata/local/catvector/gen/ia/naps.mbtiles .mbtiles
++ TILESET_NAME=naps
+++ basename /home/ia/tdata/local/catvector/gen/ia/naps.mbtiles .mbtiles
++ LAYER_NAME=naps
++ tippeargs=(--maximum-tile-bytes 500000 --cluster-densest-as-needed --cluster-distance=1 --calculate-feature-density --drop-rate 1 --minimum-zoom 3 --maximum-zoom 18 --include Name --include Time --include Duration --include StartTime --include UnixTime --include Activity --single-precision --read-parallel -l ${LAYER_NAME} -n ${TILESET_NAME} --temporary-directory "/tmp" -o ${OUTPUT_FILE} --force)
++ main
+++ dirname /home/ia/tdata/local/catvector/gen/ia/naps.mbtiles
++ mkdir -p /home/ia/tdata/local/catvector/gen/ia
++ tippecanoe --maximum-tile-bytes 500000 --cluster-densest-as-needed --cluster-distance=1 --calculate-feature-density --drop-rate 1 --minimum-zoom 3 --maximum-zoom 18 --include Name --include Time --include Duration --include StartTime --include UnixTime --include Activity --single-precision --read-parallel -l naps -n naps --temporary-directory /tmp -o /home/ia/tdata/local/catvector/gen/ia/naps.mbtiles --force
+                              Merging string pool           Merging vertices              Merging nodes                 Merging index                 0 features, 4 bytes of geometry and attributes, 0 bytes of string pool, 0 bytes of vertices, 0 bytes of nodes
+Did not read any valid geometries
+/home/ia/tdata/local/catvector/gen/ia
+├── laps.mbtiles
+├── linestrings.ndjson.gz
+├── naps.mbtiles
+└── points.ndjson.gz
+
+0 directories, 4 files
+
+real	0m0.205s
+user	0m0.229s
+sys	0m0.158s
+Running CAT_ONE=rye
+Postprocessing category: rye
+cat: '/home/ia/tdata/local/catvector/gen/rye/linestrings/*.ndjson.gz': No such file or directory
++ OUTPUT_FILE=/home/ia/tdata/local/catvector/gen/rye/laps.mbtiles
+++ basename /home/ia/tdata/local/catvector/gen/rye/laps.mbtiles .mbtiles
++ TILESET_NAME=laps
+++ basename /home/ia/tdata/local/catvector/gen/rye/laps.mbtiles .mbtiles
++ LAYER_NAME=laps
++ tippeargs=(--maximum-tile-bytes 500000 --drop-smallest-as-needed --drop-densest-as-needed --minimum-zoom 3 --maximum-zoom 15 --include Name --include Time --include Duration --include StartTime --include UnixTime --include Activity --single-precision --read-parallel -l ${LAYER_NAME} -n ${TILESET_NAME} --temporary-directory "/tmp" -o ${OUTPUT_FILE} --force)
++ main
+++ dirname /home/ia/tdata/local/catvector/gen/rye/laps.mbtiles
++ mkdir -p /home/ia/tdata/local/catvector/gen/rye
++ tippecanoe --maximum-tile-bytes 500000 --drop-smallest-as-needed --drop-densest-as-needed --minimum-zoom 3 --maximum-zoom 15 --include Name --include Time --include Duration --include StartTime --include UnixTime --include Activity --single-precision --read-parallel -l laps -n laps --temporary-directory /tmp -o /home/ia/tdata/local/catvector/gen/rye/laps.mbtiles --force
+                              Merging string pool           Merging vertices              Merging nodes                 Merging index                 0 features, 4 bytes of geometry and attributes, 0 bytes of string pool, 0 bytes of vertices, 0 bytes of nodes
+Did not read any valid geometries
+cat: '/home/ia/tdata/local/catvector/gen/rye/points/*.ndjson.gz': No such file or directory
++ OUTPUT_FILE=/home/ia/tdata/local/catvector/gen/rye/naps.mbtiles
+++ basename /home/ia/tdata/local/catvector/gen/rye/naps.mbtiles .mbtiles
++ TILESET_NAME=naps
+++ basename /home/ia/tdata/local/catvector/gen/rye/naps.mbtiles .mbtiles
++ LAYER_NAME=naps
++ tippeargs=(--maximum-tile-bytes 500000 --cluster-densest-as-needed --cluster-distance=1 --calculate-feature-density --drop-rate 1 --minimum-zoom 3 --maximum-zoom 18 --include Name --include Time --include Duration --include StartTime --include UnixTime --include Activity --single-precision --read-parallel -l ${LAYER_NAME} -n ${TILESET_NAME} --temporary-directory "/tmp" -o ${OUTPUT_FILE} --force)
++ main
+++ dirname /home/ia/tdata/local/catvector/gen/rye/naps.mbtiles
++ mkdir -p /home/ia/tdata/local/catvector/gen/rye
++ tippecanoe --maximum-tile-bytes 500000 --cluster-densest-as-needed --cluster-distance=1 --calculate-feature-density --drop-rate 1 --minimum-zoom 3 --maximum-zoom 18 --include Name --include Time --include Duration --include StartTime --include UnixTime --include Activity --single-precision --read-parallel -l naps -n naps --temporary-directory /tmp -o /home/ia/tdata/local/catvector/gen/rye/naps.mbtiles --force
+                              Merging string pool           Merging vertices              Merging nodes                 Merging index                 0 features, 4 bytes of geometry and attributes, 0 bytes of string pool, 0 bytes of vertices, 0 bytes of nodes
+Did not read any valid geometries
+/home/ia/tdata/local/catvector/gen/rye
+├── laps.mbtiles
+├── linestrings.ndjson.gz
+├── naps.mbtiles
+└── points.ndjson.gz
+
+0 directories, 4 files
+
+real	0m0.162s
+user	0m0.192s
+sys	0m0.117s

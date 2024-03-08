@@ -15,6 +15,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/montanaflynn/stats"
@@ -85,6 +87,41 @@ const (
 	TrackerStateDriving
 )
 
+var (
+	activityStationary = regexp.MustCompile(`(?i)stationary|still`)
+	activityWalking    = regexp.MustCompile(`(?i)walk`)
+	activityRunning    = regexp.MustCompile(`(?i)run`)
+	activityCycling    = regexp.MustCompile(`(?i)cycle|bike|biking`)
+	activityDriving    = regexp.MustCompile(`(?i)drive|driving|automotive`)
+)
+
+func (a TrackerStateActivity) IsMoving() bool {
+	return a > TrackerStateStationary
+}
+
+func TrackerStateActivityFromReport(report interface{}) TrackerStateActivity {
+	if report == nil {
+		return TrackerStateUnknown
+	}
+	reportStr, ok := report.(string)
+	if !ok {
+		return TrackerStateUnknown
+	}
+	switch {
+	case activityStationary.MatchString(reportStr):
+		return TrackerStateStationary
+	case activityWalking.MatchString(reportStr):
+		return TrackerStateWalking
+	case activityRunning.MatchString(reportStr):
+		return TrackerStateRunning
+	case activityCycling.MatchString(reportStr):
+		return TrackerStateCycling
+	case activityDriving.MatchString(reportStr):
+		return TrackerStateDriving
+	}
+	return TrackerStateUnknown
+}
+
 type TrackerState struct {
 	AverageSpeed float64
 	IsMoving     bool
@@ -96,6 +133,17 @@ type Tracker struct {
 	State              TrackerState
 	intervalFeatures   []*geojson.Feature // points
 	LineStringFeatures []*geojson.Feature // linestrings
+}
+
+func NewTracker(interval time.Duration) *Tracker {
+	return &Tracker{
+		Interval: interval,
+		State: TrackerState{
+			Activity: TrackerStateUnknown,
+		},
+		intervalFeatures:   make([]*geojson.Feature, 0),
+		LineStringFeatures: make([]*geojson.Feature, 0),
+	}
 }
 
 // calculatedAverageSpeedAbsolute returns the average speed in meters per second
@@ -164,16 +212,33 @@ func (t *Tracker) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 	newLineString.Properties["Duration"] = 0.0
 	newLineString.Properties["IsMoving"] = t.State.IsMoving
 
-	if t.LineStringFeatures == nil {
-		t.LineStringFeatures = []*geojson.Feature{}
-	}
 	t.LineStringFeatures = append(t.LineStringFeatures, newLineString)
 }
 
-func (t *Tracker) AddPointFeature(f *geojson.Feature) {
-	if t.intervalFeatures == nil {
-		t.intervalFeatures = []*geojson.Feature{}
+// isDiscontinuous returns true if the last point is discontinuous from the previous interval.
+func (t *Tracker) isDiscontinuous() (isDiscontinuous bool) {
+	f := t.intervalFeatures[len(t.intervalFeatures)-1]
+	if f.Properties["UUID"] != t.LastLinestring().Properties["UUID"] {
+		return true
 	}
+	if f.Properties["Activity"] != t.LastLinestring().Properties["Activity"] {
+		return true
+	}
+
+	// This
+	dist := distanceAbsolute(t.intervalFeatures)
+	// 0.8 here becomes m/s -> 1.11847 mph
+	// METERS > 0.8 * 30s = 24m
+	intervalIsMoving := dist > 0.8*flagTrackerInterval.Seconds()
+	if intervalIsMoving != t.State.IsMoving {
+		return true
+	}
+
+	return false
+}
+
+func (t *Tracker) AddPointFeature(f *geojson.Feature) {
+
 	if len(t.LineStringFeatures) == 0 {
 		t.intervalFeatures = append(t.intervalFeatures, f)
 		t.AddPointFeatureToNewLinestring(f)
@@ -185,39 +250,9 @@ func (t *Tracker) AddPointFeature(f *geojson.Feature) {
 		t.intervalFeatures = t.intervalFeatures[1:]
 	}
 
-	// // This is the definition of discontinuity which drives the creation of new linestrings.
-	// // TODO: check for activity change, etc.
-	// // TODO: refine and define the thresholds better, probably
-	// avgAbs := calculatedAverageSpeedAbsolute(t.intervalFeatures)
-	// avgRep := averageReportedSpeed(t.intervalFeatures)
-	// avgSpeed := (avgAbs + avgRep) / 2
-	// // if avgSpeed > t.State.AverageSpeed*2 || avgSpeed < t.State.AverageSpeed*0.5 {
-	// // 	// discontinuous
-	// // 	t.State.AverageSpeed = avgSpeed
-	// // 	t.AddPointFeatureToNewLinestring(f)
-	// // } else {
-	// // 	// continuous
-	// // 	t.AddPointFeatureToLastLinestring(f)
-	// // }
-	//
-	// intervalIsMoving := avgSpeed > 0.5 // m/s -> 1.11847 mph
-	// stateIsMoving := t.State.AverageSpeed > 0.5
-	// if intervalIsMoving != stateIsMoving && t.LastLinestring().Properties["Duration"].(float64) > flagTrackerInterval.Seconds() {
-	// 	// discontinuous
-	// 	t.State.AverageSpeed = avgSpeed
-	// 	t.AddPointFeatureToNewLinestring(f)
-	// } else {
-	// 	// continuous
-	// 	t.AddPointFeatureToLastLinestring(f)
-	// }
-
-	dist := distanceAbsolute(t.intervalFeatures)
-	// 0.8 here becomes m/s -> 1.11847 mph
-	// METERS > 0.8 * 30s = 24m
-	intervalIsMoving := dist > 0.8*flagTrackerInterval.Seconds()
-
-	if intervalIsMoving != t.State.IsMoving {
-		t.State.IsMoving = intervalIsMoving
+	if t.isDiscontinuous() {
+		t.State.Activity = TrackerStateActivityFromReport(f.Properties["Activity"])
+		t.State.IsMoving = t.State.Activity.IsMoving()
 		t.AddPointFeatureToNewLinestring(f)
 	} else {
 		t.AddPointFeatureToLastLinestring(f)
@@ -227,7 +262,7 @@ func (t *Tracker) AddPointFeature(f *geojson.Feature) {
 var flagTrackerInterval = flag.Duration("interval", 10*time.Second, "line detection interval")
 
 func cmdPointsToLineStrings() {
-	t := &Tracker{Interval: *flagTrackerInterval}
+	t := NewTracker(*flagTrackerInterval)
 	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
 		return f, nil
 	})
@@ -255,9 +290,7 @@ loop:
 }
 
 func cmdLinestringsToPoints() {
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
-		return f, nil
-	})
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, nil)
 loop:
 	for {
 		select {
@@ -316,11 +349,41 @@ loop:
 	}
 }
 
+func cmdValidate() {
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
+		if err := validatePointFeature(f); err != nil {
+			return nil, err
+		}
+		return f, nil
+	})
+loop:
+	for {
+		select {
+		case f := <-featureCh:
+			j, err := f.MarshalJSON()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			j = append(j, []byte("\n")...)
+			if _, err := os.Stdout.Write(j); err != nil {
+				log.Fatalln(err)
+			}
+		case err := <-errCh:
+			log.Println(err)
+		case <-closeCh:
+			break loop
+		}
+	}
+}
+
 func main() {
 
 	flag.Parse()
 	command := flag.Arg(0)
 	switch command {
+	case "validate":
+		cmdValidate()
+		return
 	case "rkalman":
 		cmdRKalmanFilter()
 		return
@@ -418,12 +481,56 @@ func (f *RKalmanFilterT) EstimateFromObservation(obs *geojson.Feature) (estimate
 	return estimatedFeature, nil
 }
 
+var errCoordinateOutOfRange = errors.New("coordinate out of range")
+
+func validatePointFeature(f *geojson.Feature) error {
+	if pt, ok := f.Geometry.(orb.Point); !ok {
+		return errors.New("not a point")
+	} else if pt.Lon() < -180 || pt.Lon() > 180 || pt.Lon() == 0 {
+		j, _ := json.MarshalIndent(f, "", "  ")
+		return fmt.Errorf("%w: longitude out of range: %f %s", errCoordinateOutOfRange, pt.Lon(), string(j))
+	} else if pt.Lat() < -90 || pt.Lat() > 90 || pt.Lat() == 0 {
+		j, _ := json.MarshalIndent(f, "", "  ")
+		return fmt.Errorf("%w: latitude out of range: %f %s", errCoordinateOutOfRange, pt.Lon(), string(j))
+	}
+
+	if _, ok := f.Properties["Time"]; !ok {
+		return errors.New("missing time")
+	}
+	t := mustGetTime(f, "Time")
+	if t.IsZero() {
+		return errors.New("invalid time")
+	}
+	if t.Before(time.Now().Add(-1 * time.Hour * 24 * 365 * 25)) {
+		return errors.New("time is too far in the past")
+	}
+	if _, ok := f.Properties["UUID"]; !ok {
+		return errors.New("missing UUID")
+	}
+	if _, ok := f.Properties["Name"]; !ok {
+		return errors.New("missing name")
+	}
+	if _, ok := f.Properties["Accuracy"]; !ok {
+		return errors.New("missing accuracy")
+	}
+	if _, ok := f.Properties["Elevation"]; !ok {
+		return errors.New("missing elevation")
+	}
+	if _, ok := f.Properties["Speed"]; !ok {
+		return errors.New("missing speed")
+	}
+	if _, ok := f.Properties["Heading"]; !ok {
+		return errors.New("missing heading")
+	}
+	return nil
+}
+
 func readStreamRKalmanFilter(reader io.Reader) (chan *geojson.Feature, chan error, chan struct{}) {
 	featureChan := make(chan *geojson.Feature)
 	errChan := make(chan error)
 	closeCh := make(chan struct{}, 1)
 
-	filter := &RKalmanFilterT{}
+	uuidFilters := map[string]*RKalmanFilterT{}
 	breader := bufio.NewReader(reader)
 
 	go func() {
@@ -441,8 +548,18 @@ func readStreamRKalmanFilter(reader io.Reader) (chan *geojson.Feature, chan erro
 				errChan <- err
 			}
 
-			if filter.Filter == nil {
-				filter.InitFromPoint(pointFeature)
+			filter, ok := uuidFilters[pointFeature.Properties["UUID"].(string)]
+			if !ok {
+				filter = &RKalmanFilterT{}
+				if err := filter.InitFromPoint(pointFeature); err != nil {
+					errChan <- err
+					continue
+				}
+				// Otherwise, we've just inited the Kalman filter for this UUID.
+				// Since its the filter's initial point, there's no sense in estimating from one point.
+				uuidFilters[pointFeature.Properties["UUID"].(string)] = filter
+				featureChan <- pointFeature
+				continue
 			}
 
 			estimate, err := filter.EstimateFromObservation(pointFeature)
@@ -482,12 +599,16 @@ func readStreamWithFeatureCallback(reader io.Reader, callback func(*geojson.Feat
 				continue
 			}
 
-			out, err := callback(pointFeature)
-			if err != nil {
-				errChan <- err
-				continue
+			if callback != nil {
+				out, err := callback(pointFeature)
+				if err != nil {
+					errChan <- err
+					continue
+				}
+				featureChan <- out
+			} else {
+				featureChan <- pointFeature
 			}
-			featureChan <- out
 		}
 	}()
 
@@ -525,10 +646,15 @@ func readStreamToLineString(reader io.Reader) (*geojson.Feature, error) {
 
 func mustGetTime(f *geojson.Feature, key string) time.Time {
 	t := time.Time{}
-	if _, ok := f.Properties[key]; !ok {
+	value, ok := f.Properties[key]
+	if !ok {
 		return t
 	}
-	tt, err := time.Parse(time.RFC3339, f.Properties[key].(string))
+	valueStr, ok := value.(string)
+	if !ok {
+		return t
+	}
+	tt, err := time.Parse(time.RFC3339, valueStr)
 	if err != nil {
 		return t
 	}
