@@ -22555,3 +22555,450 @@ Processing category: rye, batch: 0391
 2024/03/08 10:37:49 main.go:322: Douglas-Peucker simplification with threshold 8e-05
 Processing category: rye, batch: 0392
 2024/03/08 10:38:03 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0393
+2024/03/08 10:38:09 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0394
+2024/03/08 10:38:19 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:39:06 main.go:312: invalid character 't' after object key:value pair
+2024/03/08 10:39:06 main.go:312: invalid character 't' after object key:value pair
+Processing category: rye, batch: 0395
+2024/03/08 10:38:31 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0396
+2024/03/08 10:38:33 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0397
+2024/03/08 10:38:36 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0398
+2024/03/08 10:38:51 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:39:17 main.go:374: coordinate out of range: latitude out of range: -93.267731 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -93.26773071289062,
+      0
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Walking",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 96.62232971191406,
+    "Speed": -1,
+    "Time": "2023-01-16T23:23:53.887Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1673911433,
+    "Version": "V.customizableCatTrackHat"
+  }
+}
+2024/03/08 10:39:17 main.go:374: coordinate out of range: latitude out of range: -93.267731 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -93.26773071289062,
+      0
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Walking",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 96.62232971191406,
+    "Speed": -1,
+    "Time": "2023-01-16T23:23:53.894Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1673911433,
+    "Version": "V.customizableCatTrackHat",
+    "Visit": "{\"place\":\"222 Hennepin Ave, 222 Hennepin Ave, Minneapolis, MN  55401, United States @ \u003c+44.98318319,-93.26854447\u003e +\\/- 100.00m, region CLCircularRegion (identifier:'\u003c+44.98295440,-93.26903445\u003e radius 101.43', center:\u003c+44.98295440,-93.26903445\u003e, radius:101.43m)\",\"arrivalDate\":\"2023-01-16T23:08:27.999Z\",\"validVisit\":true,\"departureDate\":\"4001-01-01T00:00:00.000Z\"}"
+  }
+}
+Processing category: rye, batch: 0399
+2024/03/08 10:38:59 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0400
+2024/03/08 10:39:10 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:39:50 main.go:374: coordinate out of range: longitude out of range: 0.000000 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      0,
+      46.8475341796875
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Unknown",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 99.12715148925781,
+    "Speed": -1,
+    "Time": "2023-01-31T17:45:52.911Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1675187152,
+    "Version": "V.customizableCatTrackHat"
+  }
+}
+2024/03/08 10:39:50 main.go:374: coordinate out of range: longitude out of range: 0.000000 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      0,
+      46.8475341796875
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Unknown",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 99.12715148925781,
+    "Speed": -1,
+    "Time": "2023-01-31T17:45:52.918Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1675187152,
+    "Version": "V.customizableCatTrackHat",
+    "Visit": "{\"place\":\"5331 Ivanhoe St, 5331 Ivanhoe St, Duluth, MN  55804, United States @ \u003c+46.84753018,-92.01630722\u003e +\\/- 100.00m, region CLCircularRegion (identifier:'\u003c+46.84755870,-92.01626430\u003e radius 70.73', center:\u003c+46.84755870,-92.01626430\u003e, radius:70.73m)\",\"arrivalDate\":\"2023-01-31T17:30:27.999Z\",\"validVisit\":true,\"departureDate\":\"4001-01-01T00:00:00.000Z\"}"
+  }
+}
+Processing category: rye, batch: 0401
+2024/03/08 10:39:25 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0403
+2024/03/08 10:39:29 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0402
+2024/03/08 10:39:27 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0404
+2024/03/08 10:39:47 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0405
+2024/03/08 10:39:54 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0406
+2024/03/08 10:40:12 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0407
+2024/03/08 10:40:24 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0408
+2024/03/08 10:40:26 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0409
+2024/03/08 10:40:28 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0410
+2024/03/08 10:40:42 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0411
+2024/03/08 10:40:49 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0412
+2024/03/08 10:41:03 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0415
+2024/03/08 10:41:18 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:42:04 invalid line (is it valid JSON?)
+2024/03/08 10:42:04 main.go:312: invalid character '{' after object key:value pair
+2024/03/08 10:42:04 main.go:312: invalid character 't' after object key
+Processing category: rye, batch: 0413
+2024/03/08 10:41:13 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:41:57 main.go:374: coordinate out of range: longitude out of range: 0.000000 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      0,
+      44.9921875
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Walking",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 97.84745788574219,
+    "Speed": -1,
+    "Time": "2023-04-29T14:16:05.496Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1682777765,
+    "Version": "V.customizableCatTrackHat"
+  }
+}
+2024/03/08 10:41:57 main.go:374: coordinate out of range: longitude out of range: 0.000000 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      0,
+      44.9921875
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Walking",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 97.84745788574219,
+    "Speed": -1,
+    "Time": "2023-04-29T14:16:05.5Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1682777765,
+    "Version": "V.customizableCatTrackHat",
+    "Visit": "{\"place\":\"333 E Hennepin Ave, 333 E Hennepin Ave, Minneapolis, MN  55414, United States @ \u003c+44.98901237,-93.25542735\u003e +\\/- 100.00m, region CLCircularRegion (identifier:'\u003c+44.98875340,-93.25548910\u003e radius 70.71', center:\u003c+44.98875340,-93.25548910\u003e, radius:70.71m)\",\"arrivalDate\":\"2023-04-28T23:36:22.000Z\",\"validVisit\":true,\"departureDate\":\"2023-04-29T14:11:39.999Z\"}"
+  }
+}
+2024/03/08 10:42:04 invalid line (is it valid JSON?)
+2024/03/08 10:42:04 main.go:312: invalid character '{' after top-level value
+Processing category: rye, batch: 0414
+2024/03/08 10:41:16 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0416
+2024/03/08 10:41:32 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:42:26 invalid line (is it valid JSON?)
+Processing category: rye, batch: 0417
+2024/03/08 10:41:39 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0418
+2024/03/08 10:41:57 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0419
+2024/03/08 10:42:04 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0420
+2024/03/08 10:42:07 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0421
+2024/03/08 10:42:10 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:42:52 main.go:374: coordinate out of range: longitude out of range: 0.000000 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      0,
+      44.9835205078125
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Bike",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 98.80705261230469,
+    "Speed": -1,
+    "Time": "2023-06-20T15:40:53.395Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1687275653,
+    "Version": "V.customizableCatTrackHat"
+  }
+}
+2024/03/08 10:42:52 main.go:374: coordinate out of range: longitude out of range: 0.000000 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      0,
+      44.9835205078125
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Bike",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 98.80705261230469,
+    "Speed": -1,
+    "Time": "2023-06-20T15:40:53.401Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1687275653,
+    "Version": "V.customizableCatTrackHat",
+    "Visit": "{\"place\":\"333 E Hennepin Ave, 333 E Hennepin Ave, Minneapolis, MN  55414, United States @ \u003c+44.98905998,-93.25545692\u003e +\\/- 100.00m, region CLCircularRegion (identifier:'\u003c+44.98875340,-93.25548910\u003e radius 70.71', center:\u003c+44.98875340,-93.25548910\u003e, radius:70.71m)\",\"arrivalDate\":\"2023-06-20T13:17:01.000Z\",\"validVisit\":true,\"departureDate\":\"2023-06-20T15:37:47.000Z\"}"
+  }
+}
+Processing category: rye, batch: 0422
+2024/03/08 10:42:26 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0423
+2024/03/08 10:42:37 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0424
+2024/03/08 10:42:52 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0426
+2024/03/08 10:42:59 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:43:20 main.go:374: coordinate out of range: latitude out of range: -96.118561 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -96.11856079101562,
+      0
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Unknown",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 97.56378173828125,
+    "Speed": -1,
+    "Time": "2023-07-22T20:23:22.758Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1690057402,
+    "Version": "V.customizableCatTrackHat"
+  }
+}
+2024/03/08 10:43:20 main.go:374: coordinate out of range: latitude out of range: -96.118561 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -96.11856079101562,
+      0
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Unknown",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 97.56378173828125,
+    "Speed": -1,
+    "Time": "2023-07-22T20:23:22.765Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1690057402,
+    "Version": "V.customizableCatTrackHat",
+    "Visit": "{\"place\":\"21723–21933 Iowa Ave, 21723–21933 Iowa Ave, Onawa, IA  51040, United States @ \u003c+42.02645655,-96.11859130\u003e +\\/- 100.00m, region CLCircularRegion (identifier:'\u003c+42.02688886,-96.11858635\u003e radius 70.69', center:\u003c+42.02688886,-96.11858635\u003e, radius:70.69m)\",\"arrivalDate\":\"2023-07-22T20:18:47.000Z\",\"validVisit\":true,\"departureDate\":\"4001-01-01T00:00:00.000Z\"}"
+  }
+}
+2024/03/08 10:43:47 invalid line (is it valid JSON?)
+Processing category: rye, batch: 0425
+2024/03/08 10:42:57 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0427
+2024/03/08 10:43:03 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0428
+2024/03/08 10:43:16 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:44:06 invalid line (is it valid JSON?)
+Processing category: rye, batch: 0429
+2024/03/08 10:43:25 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:44:17 main.go:312: invalid character '{' after object key:value pair
+2024/03/08 10:44:17 main.go:312: invalid character 't' after object key
+2024/03/08 10:44:17 invalid line (is it valid JSON?)
+2024/03/08 10:44:17 main.go:312: invalid character 't' after object key
+Processing category: rye, batch: 0431
+2024/03/08 10:43:47 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:44:39 invalid line (is it valid JSON?)
+Processing category: rye, batch: 0430
+2024/03/08 10:43:41 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0432
+2024/03/08 10:43:49 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:44:42 invalid line (is it valid JSON?)
+Processing category: rye, batch: 0433
+2024/03/08 10:43:53 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0434
+2024/03/08 10:44:06 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0435
+2024/03/08 10:44:18 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0438
+2024/03/08 10:44:43 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:45:34 invalid line (is it valid JSON?)
+Processing category: rye, batch: 0436
+2024/03/08 10:44:40 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:45:35 main.go:312: invalid character 't' after object key:value pair
+2024/03/08 10:45:35 invalid line (is it valid JSON?)
+Processing category: rye, batch: 0437
+2024/03/08 10:44:41 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+parallel: Warning: A record was longer than 259066934. Increasing to --blocksize 336787016.
+Processing category: rye, batch: 0439
+2024/03/08 10:44:48 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:45:37 invalid line (is it valid JSON?)
+2024/03/08 10:45:37 main.go:312: invalid character 't' after object key
+Processing category: rye, batch: 0440
+2024/03/08 10:45:01 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0441
+2024/03/08 10:45:16 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0442
+2024/03/08 10:45:35 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:45:47 main.go:374: coordinate out of range: latitude out of range: -81.727753 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -81.72775268554688,
+      0
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Unknown",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 101.63185119628906,
+    "Speed": -1,
+    "Time": "2023-12-03T13:09:10.922Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1701608950,
+    "Version": "V.customizableCatTrackHat"
+  }
+}
+2024/03/08 10:45:47 main.go:374: coordinate out of range: latitude out of range: -81.727753 {
+  "id": 1,
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -81.72775268554688,
+      0
+    ]
+  },
+  "properties": {
+    "Accuracy": 0,
+    "Activity": "Unknown",
+    "Elevation": 0,
+    "Heading": -1,
+    "Name": "Rye13",
+    "Pressure": 101.63185119628906,
+    "Speed": -1,
+    "Time": "2023-12-03T13:09:10.929Z",
+    "UUID": "05C63745-BFA3-4DE3-AF2F-CDE2173C0E11",
+    "UnixTime": 1701608950,
+    "Version": "V.customizableCatTrackHat",
+    "Visit": "{\"place\":\"600 S Collier Blvd, 600 S Collier Blvd, Marco Island, FL  34145, United States @ \u003c+25.92052888,-81.72784346\u003e +\\/- 100.00m, region CLCircularRegion (identifier:'\u003c+25.92046240,-81.72763230\u003e radius 70.56', center:\u003c+25.92046240,-81.72763230\u003e, radius:70.56m)\",\"arrivalDate\":\"2023-12-03T13:03:56.000Z\",\"validVisit\":true,\"departureDate\":\"4001-01-01T00:00:00.000Z\"}"
+  }
+}
+Processing category: rye, batch: 0443
+2024/03/08 10:45:36 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+parallel: Warning: A record was longer than 336787016. Increasing to --blocksize 437823122.
+Processing category: rye, batch: 0444
+2024/03/08 10:45:38 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0445
+2024/03/08 10:45:42 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0446
+2024/03/08 10:45:55 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:46:55 invalid line (is it valid JSON?)
+Processing category: rye, batch: 0447
+2024/03/08 10:46:06 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0448
+2024/03/08 10:46:21 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0449
+2024/03/08 10:46:23 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+2024/03/08 10:47:26 invalid line (is it valid JSON?)
+Processing category: rye, batch: 0450
+2024/03/08 10:46:33 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0454
+2024/03/08 10:47:25 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0451
+2024/03/08 10:46:46 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0452
+2024/03/08 10:46:55 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+Processing category: rye, batch: 0453
+2024/03/08 10:47:12 main.go:322: Douglas-Peucker simplification with threshold 8e-05
+
+real	62m56.966s
+user	466m42.340s
+sys	88m43.299s

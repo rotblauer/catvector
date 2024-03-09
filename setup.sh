@@ -24,7 +24,7 @@ export OUTPUT_ROOT_CAT_ONE="${2:-${OUTPUT_ROOT}/${CAT_ONE}}"
 # It is important to keep and use a copy of the original source data
 # to ensure that the pipeline's output is reproducible, and to stabilize
 # the source against modification while the script runs.
-export OUTPUT_REFERENCE="${OUTPUT_REFERENCE:-$OUTPUT_ROOT/reference/$(basename ${TRACKS_SOURCE_GZ})}"
+export OUTPUT_REFERENCE="${OUTPUT_REFERENCE:-$OUTPUT_ROOT_CAT_ONE}"/reference.json.gz
 [[ -z "${OUTPUT_REFERENCE}" ]] && echo "OUTPUT_REFERENCE is not set" && exit 1
 mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
 [[ -f "${OUTPUT_REFERENCE}" ]] || cp "${TRACKS_SOURCE_GZ}" "${OUTPUT_REFERENCE}"

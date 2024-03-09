@@ -68,17 +68,18 @@ process() {
     | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
-    | ${BUILD_TARGET} --interval=30s points-to-linestrings \
+    | ${BUILD_TARGET} --interval=120s points-to-linestrings \
     | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
-    | tee >(
-      gfilter --match-all "#(properties.IsMoving==true),#(properties.Duration>30)" \
-        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
-    ) \
-    | tee >(
-      gfilter --match-all "#(properties.IsMoving==false)" \
-        | $BUILD_TARGET linestrings-to-points \
-        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz"
-    )
+    | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
+#    | tee >(
+#      gfilter --match-all "#(properties.IsMoving==true)" \
+#        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
+#    )
+#    | tee >(
+#      gfilter --match-all "#(properties.IsMoving==false)" \
+#        | $BUILD_TARGET linestrings-to-points \
+#        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz"
+#    )
 
     mkdir -p "$(dirname "${completed_file}")" && date > "${completed_file}"
 }
@@ -112,8 +113,16 @@ main() {
   # Skip any existing output.
 #  [[ -d "${OUTPUT_ROOT_CAT_ONE}" ]] && echo "OUTPUT_ROOT_CAT_ONE already exists: ${OUTPUT_ROOT_CAT_ONE}" && exit 0
 
+  local hash
+  hash="$(sha1sum "${OUTPUT_REFERENCE}")"
+  [[ -f "${OUTPUT_ROOT_CAT_ONE}/generated" ]] && \
+    [[ "$(cat "${OUTPUT_ROOT_CAT_ONE}/generated")" == "${hash}" ]] && \
+      echo "Generation already done: ${OUTPUT_ROOT_CAT_ONE}" && return
+
   mkdir -p "${OUTPUT_ROOT_CAT_ONE}"
+  echo OUTPUT_REFERENCE = "${OUTPUT_REFERENCE}"
   zcat "${OUTPUT_REFERENCE}" | onecat
+  echo "${hash}" > "${OUTPUT_ROOT_CAT_ONE}/generated"
 }
 main
 

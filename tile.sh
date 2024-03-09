@@ -34,9 +34,6 @@ postprocess() {
   # Remove the intermediate files.
   #     rm -rf "${OUTPUT_ROOT_CAT_ONE}"/linestrings
   #     rm -rf "${OUTPUT_ROOT_CAT_ONE}"/points
-
-  # Print a nice tree to see what we have.
-  tree "${OUTPUT_ROOT_CAT_ONE}"
 }
 
 postprocess
