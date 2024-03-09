@@ -3,7 +3,11 @@
 # set -x
 set -e
 
+# BATCH SIZE 500000 is normal for master processing.
 export PARALLEL_BATCH_SIZE=${PARALLEL_BATCH_SIZE:-500000}
+export PARALLEL_JOBS=${PARALLEL_JOBS:-10}
+# Using 100000 for testing/trials.
+#export PARALLEL_BATCH_SIZE=${PARALLEL_BATCH_SIZE:-100000}
 
 #######################################
 # This function takes a directory path as its first argument and writes to temporary files in that directory.
@@ -91,7 +95,7 @@ export -f process
 #  None
 #######################################
 onecat() {
-  parallel -j 6 --pipe -L "${PARALLEL_BATCH_SIZE}" process {#} \
+  parallel -j "${PARALLEL_JOBS}" --pipe -L "${PARALLEL_BATCH_SIZE}" process {#} \
     >/dev/null
 }
 
@@ -110,8 +114,17 @@ main() {
   script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
   source "${script_dir}/setup.sh"
 
+  # Print all important global variables.
+  echo >&2 "CAT_ONE = ${CAT_ONE}"
+  echo >&2 "BUILD_TARGET = ${BUILD_TARGET}"
+  echo >&2 "TRACKS_SOURCE_GZ = ${TRACKS_SOURCE_GZ}"
+  echo >&2 "OUTPUT_REFERENCE = ${OUTPUT_REFERENCE}"
+  echo >&2 "OUTPUT_ROOT_CAT_ONE = ${OUTPUT_ROOT_CAT_ONE}"
+  echo >&2 "PARALLEL_BATCH_SIZE = ${PARALLEL_BATCH_SIZE}"
+  echo >&2 "PARALLEL_JOBS = ${PARALLEL_JOBS}"
+
   # Skip any existing output.
-#  [[ -d "${OUTPUT_ROOT_CAT_ONE}" ]] && echo "OUTPUT_ROOT_CAT_ONE already exists: ${OUTPUT_ROOT_CAT_ONE}" && exit 0
+  #  [[ -d "${OUTPUT_ROOT_CAT_ONE}" ]] && echo "OUTPUT_ROOT_CAT_ONE already exists: ${OUTPUT_ROOT_CAT_ONE}" && exit 0
 
   local hash
   hash="$(sha1sum "${OUTPUT_REFERENCE}")"
@@ -120,7 +133,6 @@ main() {
       echo "Generation already done: ${OUTPUT_ROOT_CAT_ONE}" && return
 
   mkdir -p "${OUTPUT_ROOT_CAT_ONE}"
-  echo OUTPUT_REFERENCE = "${OUTPUT_REFERENCE}"
   zcat "${OUTPUT_REFERENCE}" | onecat
   echo "${hash}" > "${OUTPUT_ROOT_CAT_ONE}/generated"
 }

@@ -100,6 +100,24 @@ func (a TrackerStateActivity) IsMoving() bool {
 	return a > TrackerStateStationary
 }
 
+func (a TrackerStateActivity) String() string {
+	switch a {
+	case TrackerStateUnknown:
+		return "Unknown"
+	case TrackerStateStationary:
+		return "Stationary"
+	case TrackerStateWalking:
+		return "Walking"
+	case TrackerStateRunning:
+		return "Running"
+	case TrackerStateCycling:
+		return "Bike"
+	case TrackerStateDriving:
+		return "Automotive"
+	}
+	return "Unknown"
+}
+
 func (a TrackerStateActivity) IsContinuous(b TrackerStateActivity) bool {
 	if a == TrackerStateUnknown || b == TrackerStateUnknown {
 		return true
@@ -144,15 +162,35 @@ func activityMode(list []*geojson.Feature) TrackerStateActivity {
 	}
 	activitiesStats := stats.Float64Data(activities)
 	mode, _ := activitiesStats.Mode()
-	return ActivityFromReport(mode)
+	if len(mode) == 0 {
+		return TrackerStateUnknown
+	}
+	return TrackerStateActivity(mode[0])
+}
+
+func activityModeNotUnknown(list []*geojson.Feature) TrackerStateActivity {
+	activities := make([]float64, len(list))
+	for i, f := range list {
+		act := ActivityFromReport(f.Properties["Activity"])
+		activities[i] = float64(act)
+	}
+	activitiesStats := stats.Float64Data(activities)
+	mode, _ := activitiesStats.Mode()
+	for _, m := range mode {
+		if m != float64(TrackerStateUnknown) {
+			return TrackerStateActivity(m)
+		}
+	}
+	return TrackerStateUnknown
 }
 
 type Tracker struct {
-	Interval          time.Duration
-	LineStringFeature *geojson.Feature
-	lastNFeatures     []*geojson.Feature
-	intervalFeatures  []*geojson.Feature // points
-	linestringsCh     chan *geojson.Feature
+	Interval           time.Duration
+	LineStringFeature  *geojson.Feature
+	LineStringFeatures []*geojson.Feature // the points represented by the linestring
+	lastNFeatures      []*geojson.Feature
+	intervalFeatures   []*geojson.Feature // points
+	linestringsCh      chan *geojson.Feature
 }
 
 func NewTracker(interval time.Duration) *Tracker {
@@ -212,31 +250,40 @@ func timespan(a, b *geojson.Feature) time.Duration {
 	return lastTime.Sub(firstTime)
 }
 
-func distanceAbsolute(pointFeatures []*geojson.Feature) float64 {
+func getAbsoluteDistance(pointFeatures []*geojson.Feature) float64 {
 	if len(pointFeatures) < 2 {
 		return 0
 	}
 	return geo.Distance(pointFeatures[0].Point(), pointFeatures[len(pointFeatures)-1].Point())
 }
 
-func distanceTraversed(pointFeatures []*geojson.Feature) float64 {
+func getTraversedDistance(pointFeatures []*geojson.Feature) float64 {
 	if len(pointFeatures) < 2 {
 		return 0
 	}
-	distance := 0.0
+	sum := 0.0
 	for i := 1; i < len(pointFeatures); i++ {
-		distance += geo.Distance(pointFeatures[i-1].Point(), pointFeatures[i].Point())
+		sum += getAbsoluteDistance(pointFeatures[i-1 : i+1])
 	}
-	return distance
+	return sum
+}
+
+func getActivityTypeForFeature(f *geojson.Feature) TrackerStateActivity {
+	if f.Properties["Activity"] == nil {
+		return TrackerStateUnknown
+	}
+	return ActivityFromReport(f.Properties["Activity"])
 }
 
 func (t *Tracker) AddPointFeatureToLastLinestring(f *geojson.Feature) {
 	t.LineStringFeature.Geometry = append(t.LineStringFeature.Geometry.(orb.LineString), f.Point())
+	t.LineStringFeatures = append(t.LineStringFeatures, f)
 
 	// TODO: update properties properly
 	for k, v := range f.Properties {
 		t.LineStringFeature.Properties[k] = v
 	}
+	t.LineStringFeature.Properties["Activity"] = activityModeNotUnknown(t.LineStringFeatures).String()
 	t.LineStringFeature.Properties["Duration"] = mustGetTime(f, "Time").Sub(mustGetTime(t.LineStringFeature, "StartTime")).Round(time.Second).Seconds()
 }
 
@@ -246,6 +293,7 @@ func (t *Tracker) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 		t.linestringsCh <- t.LineStringFeature
 	}
 
+	t.LineStringFeatures = []*geojson.Feature{f}
 	t.LineStringFeature = geojson.NewFeature(orb.LineString{f.Point()})
 	t.LineStringFeature.Properties = map[string]interface{}{}
 	for k, v := range f.Properties {
@@ -262,22 +310,32 @@ func (t *Tracker) isDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
 		return true
 	}
 
+	currentTime := mustGetTime(f, "Time")
+	lastTime := mustGetTime(t.LastFeature(), "Time")
+	if currentTime.Before(lastTime) {
+		// Reset
+		log.Println("WARN: feature not chronological, resetting tracker", currentTime, lastTime, currentTime.Sub(lastTime).Round(time.Second))
+		t.lastNFeatures = []*geojson.Feature{}
+		t.intervalFeatures = []*geojson.Feature{}
+		return true
+	}
+
 	// Split any tracks separated by the INTERVAL in time.
 	if span := timespan(t.LastFeature(), f); span > *flagTrackerInterval || span < 0 {
 		return true
 	}
 
-	// // Try to remove GPS jitters by comparing reported and calculated speeds.
-	// // A/B tracks that are jittery will have a higher calculated speed than the reported speed.
-	// reportedSpeedA := t.LastFeature().Properties["Speed"].(float64)
-	// reportedSpeedB := f.Properties["Speed"].(float64)
-	// reportedSpeedMean := (reportedSpeedA + reportedSpeedB) / 2
-	//
-	// calculatedSpeed := calculatedAverageSpeedAbsolute([]*geojson.Feature{t.LastFeature(), f})
-	//
-	// if calculatedSpeed > math.Pow(reportedSpeedMean, 2) {
-	// 	return true
-	// }
+	// Try to remove GPS jitters by comparing reported and calculated speeds.
+	// A/B tracks that are jittery will have a higher calculated speed than the reported speed.
+	reportedSpeedA := t.LastFeature().Properties["Speed"].(float64)
+	reportedSpeedB := f.Properties["Speed"].(float64)
+	reportedSpeedMean := (reportedSpeedA + reportedSpeedB) / 2
+
+	calculatedSpeed := calculatedAverageSpeedAbsolute([]*geojson.Feature{t.LastFeature(), f})
+
+	if calculatedSpeed > math.Pow(reportedSpeedMean, 2) {
+		return true
+	}
 
 	incumbent := activityMode(t.intervalFeatures)
 	next := activityMode(append(t.intervalFeatures, f))
@@ -285,23 +343,17 @@ func (t *Tracker) isDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
 		return true
 	}
 
-	// activityA := ActivityFromReport(t.LastFeature().Properties["Activity"])
-	// activityB := ActivityFromReport(f.Properties["Activity"])
-	// if !activityA.IsContinuous(activityB) {
-	// 	return true
-	// }
-
 	return false
 }
 
 func (t *Tracker) AddPointFeature(f *geojson.Feature) {
 	if t.LastFeature() != nil {
-		if mustGetTime(f, "Time").Before(mustGetTime(t.LastFeature(), "Time")) {
-			b, _ := json.MarshalIndent(f, "", "  ")
-			a, _ := json.MarshalIndent(t.LastFeature(), "", "  ")
-			log.Println("not chronological, skipping current", "last", string(a), "current", string(b))
-			return
-		}
+		// if mustGetTime(f, "Time").Before(mustGetTime(t.LastFeature(), "Time")) {
+		// 	a, _ := json.Marshal(t.LastFeature())
+		// 	b, _ := json.Marshal(f)
+		// 	log.Println("not chronological, skipping current", "\nlast", string(a), "\ncurrent", string(b))
+		// 	return
+		// }
 	}
 
 	if t.isDiscontinuous(f) {
@@ -329,9 +381,7 @@ var flagTrackerInterval = flag.Duration("interval", 10*time.Second, "line detect
 func cmdPointsToLineStrings() {
 	trackerWaiter := sync.WaitGroup{}
 	uuidTrackers := map[string]*Tracker{}
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
-		return f, nil
-	})
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, nil)
 loop:
 	for {
 		select {
