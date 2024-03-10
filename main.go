@@ -49,34 +49,6 @@ const (
 	earthCircumferenceDegreesPerMeter = 360 / earthCircumference
 )
 
-func cmdRKalmanFilter() {
-	bwriter := bufio.NewWriter(os.Stdout)
-	featureCh, errCh, closeCh := readStreamRKalmanFilter(os.Stdin)
-
-loop:
-	for {
-		select {
-		case feature := <-featureCh:
-			j, err := feature.MarshalJSON()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			j = append(j, []byte("\n")...)
-			if _, err := bwriter.Write(j); err != nil {
-				log.Fatalln(err)
-			}
-		case err := <-errCh:
-			log.Println(err)
-		case <-closeCh:
-			break loop
-		}
-	}
-
-	if err := bwriter.Flush(); err != nil {
-		log.Fatalln(err)
-	}
-}
-
 type TrackerStateActivity int
 
 const (
@@ -216,6 +188,26 @@ func (t *Tracker) Flush() {
 	close(t.linestringsCh)
 }
 
+func (t *Tracker) AddFeatureToState(f *geojson.Feature) {
+	t.intervalFeatures = append(t.intervalFeatures, f)
+	for i := len(t.intervalFeatures) - 1; i > 0; i-- {
+		if timespan(t.intervalFeatures[i], f) > t.Interval {
+			t.intervalFeatures = t.intervalFeatures[i:]
+			break
+		}
+	}
+
+	t.lastNFeatures = append(t.lastNFeatures, f)
+	for len(t.lastNFeatures) > 10 {
+		t.lastNFeatures = t.lastNFeatures[1:]
+	}
+}
+
+func (t *Tracker) ResetState() {
+	t.lastNFeatures = []*geojson.Feature{}
+	t.intervalFeatures = []*geojson.Feature{}
+}
+
 // calculatedAverageSpeedAbsolute returns the average speed in meters per second
 // between the first point and last. Round trips will theoretically return 0.
 func calculatedAverageSpeedAbsolute(pointFeatures []*geojson.Feature) float64 {
@@ -228,6 +220,17 @@ func calculatedAverageSpeedAbsolute(pointFeatures []*geojson.Feature) float64 {
 	distance := geo.Distance(pointFeatures[0].Point(), pointFeatures[len(pointFeatures)-1].Point())
 
 	return distance / timeDelta
+}
+
+func calculatedAverageSpeedTraversed(pointFeatures []*geojson.Feature) float64 {
+	if len(pointFeatures) < 2 {
+		return 0
+	}
+	sum := 0.0
+	for i := 1; i < len(pointFeatures); i++ {
+		sum += calculatedAverageSpeedAbsolute(pointFeatures[i-1 : i+1])
+	}
+	return sum / float64(len(pointFeatures)-1)
 }
 
 func averageReportedSpeed(pointFeatures []*geojson.Feature) float64 {
@@ -283,8 +286,14 @@ func (t *Tracker) AddPointFeatureToLastLinestring(f *geojson.Feature) {
 	for k, v := range f.Properties {
 		t.LineStringFeature.Properties[k] = v
 	}
+
+	t.LineStringFeature.Properties["NumberOfPoints"] = len(t.LineStringFeatures)
 	t.LineStringFeature.Properties["Activity"] = activityModeNotUnknown(t.LineStringFeatures).String()
-	t.LineStringFeature.Properties["Duration"] = mustGetTime(f, "Time").Sub(mustGetTime(t.LineStringFeature, "StartTime")).Round(time.Second).Seconds()
+	t.LineStringFeature.Properties["Duration"] = timespan(t.LineStringFeatures[0], f).Round(time.Second).Seconds()
+	t.LineStringFeature.Properties["DistanceTraversed"] = getTraversedDistance(t.LineStringFeatures)
+	t.LineStringFeature.Properties["DistanceAbsolute"] = getAbsoluteDistance(t.LineStringFeatures)
+	t.LineStringFeature.Properties["AverageReportedSpeed"] = averageReportedSpeed(t.LineStringFeatures)
+	t.LineStringFeature.Properties["AverageCalculatedSpeed"] = calculatedAverageSpeedTraversed(t.LineStringFeatures)
 }
 
 func (t *Tracker) AddPointFeatureToNewLinestring(f *geojson.Feature) {
@@ -301,11 +310,12 @@ func (t *Tracker) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 	}
 	t.LineStringFeature.Properties["StartTime"] = f.Properties["Time"]
 	t.LineStringFeature.Properties["Duration"] = 0.0
-	t.LineStringFeature.Properties["IsMoving"] = ActivityFromReport(f.Properties["Activity"]).IsMoving()
 }
 
-// isDiscontinuous returns true if the last point is discontinuous from the previous interval.
-func (t *Tracker) isDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
+// IsDiscontinuous returns true if the last point is discontinuous from the previous interval.
+// According to some paper I found somewhere onetime, it's generally better
+// to break more than less. Trips/lines can then be synthesized later.
+func (t *Tracker) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
 	if len(t.lastNFeatures) == 0 {
 		return true
 	}
@@ -315,8 +325,7 @@ func (t *Tracker) isDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
 	if currentTime.Before(lastTime) {
 		// Reset
 		log.Println("WARN: feature not chronological, resetting tracker", currentTime, lastTime, currentTime.Sub(lastTime).Round(time.Second))
-		t.lastNFeatures = []*geojson.Feature{}
-		t.intervalFeatures = []*geojson.Feature{}
+		t.ResetState()
 		return true
 	}
 
@@ -327,16 +336,13 @@ func (t *Tracker) isDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
 
 	// Try to remove GPS jitters by comparing reported and calculated speeds.
 	// A/B tracks that are jittery will have a higher calculated speed than the reported speed.
-	reportedSpeedA := t.LastFeature().Properties["Speed"].(float64)
-	reportedSpeedB := f.Properties["Speed"].(float64)
-	reportedSpeedMean := (reportedSpeedA + reportedSpeedB) / 2
-
+	reportedSpeedMean := averageReportedSpeed([]*geojson.Feature{t.LastFeature(), f})
 	calculatedSpeed := calculatedAverageSpeedAbsolute([]*geojson.Feature{t.LastFeature(), f})
-
 	if calculatedSpeed > math.Pow(reportedSpeedMean, 2) {
 		return true
 	}
 
+	// If the activity type changes, we should start a new linestring.
 	incumbent := activityMode(t.intervalFeatures)
 	next := activityMode(append(t.intervalFeatures, f))
 	if !incumbent.IsContinuous(next) {
@@ -347,33 +353,12 @@ func (t *Tracker) isDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
 }
 
 func (t *Tracker) AddPointFeature(f *geojson.Feature) {
-	if t.LastFeature() != nil {
-		// if mustGetTime(f, "Time").Before(mustGetTime(t.LastFeature(), "Time")) {
-		// 	a, _ := json.Marshal(t.LastFeature())
-		// 	b, _ := json.Marshal(f)
-		// 	log.Println("not chronological, skipping current", "\nlast", string(a), "\ncurrent", string(b))
-		// 	return
-		// }
-	}
-
-	if t.isDiscontinuous(f) {
+	if t.IsDiscontinuous(f) {
 		t.AddPointFeatureToNewLinestring(f)
 	} else {
 		t.AddPointFeatureToLastLinestring(f)
 	}
-
-	t.intervalFeatures = append(t.intervalFeatures, f)
-	for i := len(t.intervalFeatures) - 1; i > 0; i-- {
-		if timespan(t.intervalFeatures[i], f) > t.Interval {
-			t.intervalFeatures = t.intervalFeatures[i:]
-			break
-		}
-	}
-
-	t.lastNFeatures = append(t.lastNFeatures, f)
-	for len(t.lastNFeatures) > 10 {
-		t.lastNFeatures = t.lastNFeatures[1:]
-	}
+	t.AddFeatureToState(f)
 }
 
 var flagTrackerInterval = flag.Duration("interval", 10*time.Second, "line detection interval")
@@ -507,7 +492,6 @@ loop:
 }
 
 func main() {
-
 	flag.Parse()
 	command := flag.Arg(0)
 	switch command {
@@ -528,6 +512,34 @@ func main() {
 		return
 	default:
 		log.Fatalf("unknown command: %s", command)
+	}
+}
+
+func cmdRKalmanFilter() {
+	bwriter := bufio.NewWriter(os.Stdout)
+	featureCh, errCh, closeCh := readStreamRKalmanFilter(os.Stdin)
+
+loop:
+	for {
+		select {
+		case feature := <-featureCh:
+			j, err := feature.MarshalJSON()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			j = append(j, []byte("\n")...)
+			if _, err := bwriter.Write(j); err != nil {
+				log.Fatalln(err)
+			}
+		case err := <-errCh:
+			log.Println(err)
+		case <-closeCh:
+			break loop
+		}
+	}
+
+	if err := bwriter.Flush(); err != nil {
+		log.Fatalln(err)
 	}
 }
 

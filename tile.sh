@@ -27,8 +27,12 @@ postprocess() {
     | tee -a "${OUTPUT_ROOT_CAT_ONE}/linestrings.json.gz" \
     | zcat | ${script_dir}/runtpl.sh "${OUTPUT_ROOT_CAT_ONE}/laps.mbtiles"
 
+  # This can fail because I'm not handling points right now
+  # in the pipeline.
   set +e
-  cat "${OUTPUT_ROOT_CAT_ONE}"/points/*.json.gz \
+
+  [[ -d "${OUTPUT_ROOT_CAT_ONE}"/points ]] \
+  && cat "${OUTPUT_ROOT_CAT_ONE}"/points/*.json.gz \
     | tee -a "${OUTPUT_ROOT_CAT_ONE}/points.json.gz" \
     | zcat | ${script_dir}/runtpp.sh "${OUTPUT_ROOT_CAT_ONE}/naps.mbtiles"
 
