@@ -53,7 +53,6 @@ export -f intermediary_gzipping_to
 #  None
 #######################################
 process() {
-  #     | ${BUILD_TARGET} rkalman \
   local batch_id
   printf -v batch_id "%04d" "${1}"
   [[ -z "${CAT_ONE}" ]] && echo "CAT_ONE is not set" && exit 1
@@ -75,6 +74,7 @@ process() {
     | ${BUILD_TARGET} --interval=120s points-to-linestrings \
     | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
+#    | ${BUILD_TARGET} rkalman \
 #    | tee >(
 #      gfilter --match-all "#(properties.IsMoving==true)" \
 #        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
@@ -94,7 +94,7 @@ export -f process
 # Arguments:
 #  None
 #######################################
-onecat() {
+parallel_process() {
   parallel -j "${PARALLEL_JOBS}" --pipe -L "${PARALLEL_BATCH_SIZE}" process {#} \
     >/dev/null
 }
@@ -110,6 +110,8 @@ onecat() {
 #  None
 #######################################
 main() {
+  set -x
+  set -e
   local script_dir
   script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
   source "${script_dir}/setup.sh"
@@ -123,18 +125,19 @@ main() {
   echo >&2 "PARALLEL_BATCH_SIZE = ${PARALLEL_BATCH_SIZE}"
   echo >&2 "PARALLEL_JOBS = ${PARALLEL_JOBS}"
 
-  # Skip any existing output.
-  #  [[ -d "${OUTPUT_ROOT_CAT_ONE}" ]] && echo "OUTPUT_ROOT_CAT_ONE already exists: ${OUTPUT_ROOT_CAT_ONE}" && exit 0
-
+  # Skip any existing output corresponding to the hash of the input (file) (OUTPUT_REFERENCE).
   local hash
   hash="$(sha1sum "${OUTPUT_REFERENCE}")"
   [[ -f "${OUTPUT_ROOT_CAT_ONE}/generated" ]] && \
-    [[ "$(cat "${OUTPUT_ROOT_CAT_ONE}/generated")" == "${hash}" ]] && \
-      echo "Generation already done: ${OUTPUT_ROOT_CAT_ONE}" && return
+    [[ "$(head -1 "${OUTPUT_ROOT_CAT_ONE}/generated")" == "${hash}" ]] && \
+      echo "Generation for ${OUTPUT_REFERENCE} already done: ${OUTPUT_ROOT_CAT_ONE}. Exiting." && return
 
   mkdir -p "${OUTPUT_ROOT_CAT_ONE}"
-  zcat "${OUTPUT_REFERENCE}" | onecat
+  zcat "${OUTPUT_REFERENCE}" | parallel_process
+
+  # We're done, store the hash of the input file to the 'generated' file.
   echo "${hash}" > "${OUTPUT_ROOT_CAT_ONE}/generated"
+  date >> "${OUTPUT_ROOT_CAT_ONE}/generated"
 }
 main
 

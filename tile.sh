@@ -27,6 +27,7 @@ postprocess() {
     | tee -a "${OUTPUT_ROOT_CAT_ONE}/linestrings.json.gz" \
     | zcat | ${script_dir}/runtpl.sh "${OUTPUT_ROOT_CAT_ONE}/laps.mbtiles"
 
+  set +e
   cat "${OUTPUT_ROOT_CAT_ONE}"/points/*.json.gz \
     | tee -a "${OUTPUT_ROOT_CAT_ONE}/points.json.gz" \
     | zcat | ${script_dir}/runtpp.sh "${OUTPUT_ROOT_CAT_ONE}/naps.mbtiles"

@@ -1,12 +1,39 @@
 #!/usr/bin/env bash
 
-set -e
-export TRACKS_SOURCE_GZ="/home/ia/tdata/master.json.gz"
-kitties=(rye)
-for kitty in "${kitties[@]}"
-do 
-  export CAT_ONE="${kitty}"
-  echo "Running CAT_ONE=${CAT_ONE}"
-  time ./gen.sh
-#  time ./tile.sh
-done
+
+main() {
+  set -e
+
+  # - batch-023* stl, w-s, boone, denver
+  # - batch-033* was for me missoula, glacier, to grandma's to buying the Ranger, ryne standard lake dodger
+  # - batch-042* is a nice testdata batch, it includes RAGBRAI 2023.
+  local batch_id="batch-023"
+  local kitty
+  for kitty in rye ia; do
+    export CAT_ONE="${kitty}"
+    export OUTPUT_ROOT="$HOME/tdata/local/catvector/${batch_id}x"
+    export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
+    export TRACKS_SOURCE_GZ="${OUTPUT_REFERENCE}"
+
+    # Derive the trial file from the pre-generated batch_id-wildcard batch files.
+    # Concat gz files.
+    local concatables="${HOME}/tdata/local/catvector/gen/${CAT_ONE}/valid/${batch_id}"
+
+    set -x
+    mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
+    >"${OUTPUT_REFERENCE}"
+    cat "${concatables}"* >>"${OUTPUT_REFERENCE}"
+    { set +x; } 2>/dev/null
+
+    local script_dir
+    script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+
+    set -x
+    echo "Running ${script_dir}/gen.sh"
+    time "${script_dir}/gen.sh"
+
+    echo "Running ${script_dir}/tile.sh"
+    time "${script_dir}/tile.sh"
+  done
+}
+main
