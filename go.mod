@@ -3,6 +3,7 @@ module github.com/rotblauer/catvector
 go 1.21.2
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/flopp/go-staticmaps v0.0.0-20220221183018-c226716bec53
 	github.com/fogleman/gg v1.3.0
 	github.com/golang/geo v0.0.0-20230421003525-6adc56603217
@@ -16,12 +17,10 @@ require (
 require (
 	github.com/flopp/go-coordsparser v0.0.0-20201115094714-8baaeb7062d5 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
-	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/tkrajina/gpxgo v1.3.1 // indirect
 	go.mongodb.org/mongo-driver v1.11.4 // indirect
 	golang.org/x/image v0.15.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
 

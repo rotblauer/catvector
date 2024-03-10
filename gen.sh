@@ -66,15 +66,16 @@ process() {
     return
   fi
 
+#    | ${BUILD_TARGET} rkalman \
   echo >&2 "Processing category: ${CAT_ONE}, batch: ${batch_id}"
   ${BUILD_TARGET} validate \
     | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
-    | ${BUILD_TARGET} --interval=120s points-to-linestrings \
+    | ${BUILD_TARGET} --interval=60s points-to-linestrings \
     | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
-#    | ${BUILD_TARGET} rkalman \
+#    | ${BUILD_TARGET} --interval=60s laps-or-naps
 #    | tee >(
 #      gfilter --match-all "#(properties.IsMoving==true)" \
 #        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
