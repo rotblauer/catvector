@@ -3,7 +3,7 @@
 main() {
   set -e
 
-  CAT_ONE=ia
+  CAT_ONE=rye
 
   local trial_file
   trial_file="${HOME}/tdata/local/catvector/source/${CAT_ONE}/valid/trial.json.gz"
