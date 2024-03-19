@@ -39,7 +39,7 @@ func TestRKalmanFilter(t *testing.T) {
 	filter := &RKalmanFilterT{}
 	kFeatureCh, errCh, closeCh := readStreamWithFeatureCallback(in, func(feature *geojson.Feature) (out *geojson.Feature, err error) {
 		if filter.Filter == nil {
-			if err := filter.InitFromPoint(feature); err != nilw {
+			if err := filter.InitFromPoint(feature); err != nil {
 				t.Fatal(err)
 			}
 		}

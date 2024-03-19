@@ -66,27 +66,36 @@ process() {
     return
   fi
 
-#    | ${BUILD_TARGET} rkalman \
+  #    | ${BUILD_TARGET} rkalman \
   echo >&2 "Processing category: ${CAT_ONE}, batch: ${batch_id}"
   ${BUILD_TARGET} validate \
     | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
-    | ${BUILD_TARGET} --interval=60s points-to-linestrings \
-    | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
-    | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
-#    | ${BUILD_TARGET} --interval=60s laps-or-naps
-#    | tee >(
-#      gfilter --match-all "#(properties.IsMoving==true)" \
-#        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
-#    )
-#    | tee >(
-#      gfilter --match-all "#(properties.IsMoving==false)" \
-#        | $BUILD_TARGET linestrings-to-points \
-#        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz"
-#    )
+    | ${BUILD_TARGET} --interval=60s --speed-threshold=0.5 trip-detector \
+    | tee >( \
+      gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
+        | ${BUILD_TARGET} --interval=120s points-to-linestrings \
+        | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
+        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
+    ) \
+    | tee >( \
+      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
+        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
+    )
 
-    mkdir -p "$(dirname "${completed_file}")" && date > "${completed_file}"
+  #    | ${BUILD_TARGET} --interval=60s laps-or-naps
+  #    | tee >(
+  #      gfilter --match-all "#(properties.IsMoving==true)" \
+  #        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
+  #    )
+  #    | tee >(
+  #      gfilter --match-all "#(properties.IsMoving==false)" \
+  #        | $BUILD_TARGET linestrings-to-points \
+  #        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz"
+  #    )
+
+  mkdir -p "$(dirname "${completed_file}")" && date >"${completed_file}"
 }
 export -f process
 
@@ -129,16 +138,16 @@ main() {
   # Skip any existing output corresponding to the hash of the input (file) (OUTPUT_REFERENCE).
   local hash
   hash="$(sha1sum "${OUTPUT_REFERENCE}")"
-  [[ -f "${OUTPUT_ROOT_CAT_ONE}/generated" ]] && \
-    [[ "$(head -1 "${OUTPUT_ROOT_CAT_ONE}/generated")" == "${hash}" ]] && \
-      echo "Generation for ${OUTPUT_REFERENCE} already done: ${OUTPUT_ROOT_CAT_ONE}. Exiting." && return
+  [[ -f "${OUTPUT_ROOT_CAT_ONE}/generated" ]] \
+    && [[ "$(head -1 "${OUTPUT_ROOT_CAT_ONE}/generated")" == "${hash}" ]] \
+    && echo "Generation for ${OUTPUT_REFERENCE} already done: ${OUTPUT_ROOT_CAT_ONE}. Exiting." && return
 
   mkdir -p "${OUTPUT_ROOT_CAT_ONE}"
   zcat "${OUTPUT_REFERENCE}" | parallel_process
 
   # We're done, store the hash of the input file to the 'generated' file.
-  echo "${hash}" > "${OUTPUT_ROOT_CAT_ONE}/generated"
-  date >> "${OUTPUT_ROOT_CAT_ONE}/generated"
+  echo "${hash}" >"${OUTPUT_ROOT_CAT_ONE}/generated"
+  date >>"${OUTPUT_ROOT_CAT_ONE}/generated"
 }
 main
 

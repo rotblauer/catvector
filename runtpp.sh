@@ -25,6 +25,7 @@ tippeargs=(
     --include StartTime
     --include UnixTime
     --include Activity
+    --include IsTrip
 
     --single-precision
 

@@ -33,5 +33,5 @@ mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
 # Build the go program to avoid having to do that repeatedly.
 export BUILD_TARGET=./build/bin/catvector
 mkdir -p "$(dirname ${BUILD_TARGET})"
-go build -o "${BUILD_TARGET}" ./main.go
+go build -o "${BUILD_TARGET}" .
 

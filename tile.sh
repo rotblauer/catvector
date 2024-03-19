@@ -25,7 +25,7 @@ postprocess() {
   # Concat all the files into one, for both linestrings and points.
   cat "${OUTPUT_ROOT_CAT_ONE}"/linestrings/*.json.gz \
     | tee -a "${OUTPUT_ROOT_CAT_ONE}/linestrings.json.gz" \
-    | zcat | ${script_dir}/runtpl.sh "${OUTPUT_ROOT_CAT_ONE}/laps.mbtiles"
+    | zcat | ${script_dir}/runtpl.sh "${OUTPUT_ROOT_CAT_ONE}/laps.mbtiles" || true
 
   # This can fail because I'm not handling points right now
   # in the pipeline.

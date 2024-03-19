@@ -7,9 +7,9 @@ main() {
   # - batch-023* stl, w-s, boone, denver
   # - batch-033* was for me missoula, glacier, to grandma's to buying the Ranger, ryne standard lake dodger
   # - batch-042* is a nice testdata batch, it includes RAGBRAI 2023.
-  local batch_id="batch-041"
+  local batch_id="batch-042"
   local kitty
-  for kitty in ia rye; do
+  for kitty in ia; do
     export CAT_ONE="${kitty}"
     export OUTPUT_ROOT="$HOME/tdata/local/catvector/${batch_id}x"
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
@@ -22,7 +22,10 @@ main() {
     set -x
     mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
     >"${OUTPUT_REFERENCE}"
-    cat "${concatables}"* >>"${OUTPUT_REFERENCE}"
+    for f in "${concatables}"*; do
+      cat "${f}" >>"${OUTPUT_REFERENCE}"
+    done
+#    cat "${concatables}"* >>"${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
 
     local script_dir
