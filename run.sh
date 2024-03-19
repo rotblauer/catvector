@@ -9,7 +9,7 @@ main() {
   # - batch-042* is a nice testdata batch, it includes RAGBRAI 2023.
   local batch_id="batch-042"
   local kitty
-  for kitty in ia; do
+  for kitty in rye; do
     export CAT_ONE="${kitty}"
     export OUTPUT_ROOT="$HOME/tdata/local/catvector/${batch_id}x"
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"

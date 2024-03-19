@@ -72,17 +72,18 @@ process() {
     | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
-    | ${BUILD_TARGET} --interval=60s --speed-threshold=0.5 trip-detector \
-    | tee >( \
-      gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
-        | ${BUILD_TARGET} --interval=120s points-to-linestrings \
-        | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
-        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
-    ) \
-    | tee >( \
-      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
-        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
-    )
+    | ${BUILD_TARGET} preprocess \
+    | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz"
+#    | tee >( \
+#      gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
+#        | ${BUILD_TARGET} --interval=120s points-to-linestrings \
+#        | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
+#        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
+#    ) \
+#    | tee >( \
+#      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
+#        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
+#    )
 
   #    | ${BUILD_TARGET} --interval=60s laps-or-naps
   #    | tee >(
@@ -151,6 +152,6 @@ main() {
 }
 main
 
-# cattracks explorer
+# rotblauer/cattracks-explorer
 # http://localhost:8080/public/?geojson=http://localhost:8000/rye/reference.fc.json,http://localhost:8000/rye/rkalman-linestrings-dp-stationary.fc.json
 # http://localhost:8080/public/?vector=http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf

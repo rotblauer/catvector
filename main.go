@@ -31,6 +31,7 @@ import (
 	"github.com/montanaflynn/stats"
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geojson"
+	"github.com/paulmach/orb/planar"
 	"github.com/paulmach/orb/simplify"
 	rkalman "github.com/regnull/kalman"
 	"github.com/rosshemsley/kalman"
@@ -317,6 +318,131 @@ loop:
 	}
 }
 
+func preProcessFilters(f *geojson.Feature) (*geojson.Feature, error) {
+	// 1. NSAT: number of satellites > 4
+	//    Don't have this info :(
+
+	// 2. Altitude filter: -10 < altitude < 15000. (Commercial flight cruising altitude commonly 33000..(42000 ft == 12800 m))
+	// Sorry to all you high-flying high-flyers out there.
+	// > The Earth's lowest land elevation point is at the Dead Sea, located at the border of Israel and Jordan. Its shores have an elevation of 420 meters (1,385 feet) below sea level.
+	// > https://www.nationalgeographic.org/encyclopedia/elevation/
+	// Don't dive in the Red Sea or your cattrack won't work. Not worth it.
+	if f.Properties.MustFloat64("Elevation") < -450 || f.Properties.MustFloat64("Elevation") > 13000 {
+		return nil, fmt.Errorf("altitude out of range: %f", f.Properties.MustFloat64("Elevation"))
+	}
+
+	// 3. Urban canyon filter.
+
+	// 4. Speed filter.
+	// Assume less than the speed of sound. Sorry to all you speed demons out there.
+	if f.Properties.MustFloat64("Speed") > 343 {
+		return nil, fmt.Errorf("speed out of range: %f", f.Properties.MustFloat64("Speed"))
+	}
+	return f, nil
+}
+
+// urbanCanyonFilterStream removes spurious GPS readings caused by the urban canyon effect.
+// > Wang: Third, GPS points away from
+// the adjacent points due to the signal shift caused by
+// blocking or ‘‘urban canyon’’ effect are also deleted. As
+// is shown in Figure 2, GPS points away from both the
+// before and after 5 points center for more than 200 m
+// should be considered as shift points.
+func urbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh chan struct{}) (chan *geojson.Feature, chan error, chan struct{}) {
+	featureChan := make(chan *geojson.Feature)
+	errChan := make(chan error)
+	closeCh := make(chan struct{}, 1)
+
+	spuriousDistanceMeters := 100.0                // ! Wang says 200, but I got no hits with that on Rye in batch 42.
+	buffer, bufferSize := []*geojson.Feature{}, 11 // 11 = 5 + 1 + 5
+
+	go func() {
+		for {
+			select {
+			case f := <-featuresCh:
+				buffer = append(buffer, f)
+				if len(buffer) < bufferSize {
+					// The FIRST 5 points get automatically flushed without filtering
+					// because there are no head points to compare them against.
+					if len(buffer) <= 5 {
+						featureChan <- f
+					}
+					continue
+				}
+				// If we've reached the buffer size, we can start processing.
+				if len(buffer) > bufferSize {
+					// Truncate the buffer to the last 11 elements.
+					buffer = buffer[len(buffer)-bufferSize:]
+				}
+				// [inclusive:exclusive)
+				tail := buffer[0:5]
+				target := buffer[5]
+				head := buffer[6:]
+
+				// Find the centroid of the tail.
+				tailCenter, _ := planar.CentroidArea(orb.MultiPoint{tail[0].Point(), tail[1].Point(), tail[2].Point(), tail[3].Point(), tail[4].Point()})
+				// Find the centroid of the head.
+				headCenter, _ := planar.CentroidArea(orb.MultiPoint{head[0].Point(), head[1].Point(), head[2].Point(), head[3].Point(), head[4].Point()})
+				// If the distances from the target to the tail and head centroids are more than 200m, it's a shift point.
+				if planar.Distance(tailCenter, target.Point()) > spuriousDistanceMeters && planar.Distance(headCenter, target.Point()) > spuriousDistanceMeters {
+					j, _ := json.Marshal(target)
+					errChan <- fmt.Errorf("urban canyon spurious point: %s", string(j))
+					continue
+				} else {
+					featureChan <- target
+				}
+
+			case x := <-closingCh:
+				// We never filled the buffer, flush all.
+				// This indicates a noop filter because of an insufficient number of points.
+				if len(buffer) > 5 && len(buffer) < bufferSize {
+					for _, f := range buffer[5:] {
+						featureChan <- f
+					}
+				} else {
+					// Else we met the buffer size, but (always) the tailing 5 points get flushed
+					// without filtering because there are no tail points to compare them against.
+					for _, f := range buffer[6:] {
+						featureChan <- f
+					}
+				}
+				closeCh <- x
+				return
+			}
+		}
+	}()
+	return featureChan, errChan, closeCh
+}
+
+func cmdPreprocess() {
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, preProcessFilters)
+	processedCh, procErrCh, doneCh := urbanCanyonFilterStream(featureCh, closeCh)
+
+loop:
+	for {
+		select {
+		case f := <-processedCh:
+			if f == nil {
+				continue
+			}
+			j, err := f.MarshalJSON()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			j = append(j, []byte("\n")...)
+			if _, err := os.Stdout.Write(j); err != nil {
+				log.Fatalln(err)
+			}
+		case err := <-errCh:
+			log.Println(err)
+		case err := <-procErrCh:
+			log.Println(err)
+		case <-doneCh:
+			break loop
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	command := flag.Arg(0)
@@ -341,6 +467,9 @@ func main() {
 		return
 	case "douglas-peucker":
 		cmdDouglasPeucker()
+		return
+	case "preprocess":
+		cmdPreprocess()
 		return
 	default:
 		log.Fatalf("unknown command: %s", command)
