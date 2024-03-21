@@ -251,15 +251,7 @@ func (t *PointTracker) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous bool
 	if span := timespan(t.LastFeature(), f); span > *flagDwellInterval || span < 0 {
 		return true
 	}
-
-	// // Try to remove GPS jitters by comparing reported and calculated speeds.
-	// // A/B tracks that are jittery will have a higher calculated speed than the reported speed.
-	// reportedSpeedMean := averageReportedSpeed([]*geojson.Feature{t.LastFeature(), f})
-	// calculatedSpeed := calculatedAverageSpeedAbsolute([]*geojson.Feature{t.LastFeature(), f})
-	// if calculatedSpeed > math.Pow(reportedSpeedMean, 2) {
-	// 	return true
-	// }
-
+	
 	// // If the activity type changes, we should start a new linestring.
 	// incumbent := activityMode(t.intervalFeatures)
 	// next := activityMode(append(t.intervalFeatures, f))
