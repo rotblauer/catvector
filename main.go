@@ -52,6 +52,7 @@ const (
 
 var flagTrackerInterval = flag.Duration("interval", 10*time.Second, "line detection interval")
 var flagTrackerSpeedThreshold = flag.Float64("speed-threshold", 0.5, "speed threshold for trip detection")
+var flagClusterDistanceThreshold = flag.Float64("cluster-distance", 10.0, "cluster distance threshold for trip stops")
 
 func cmdPointsToLineStrings() {
 	trackerWaiter := sync.WaitGroup{}
@@ -286,7 +287,7 @@ loop:
 			}
 			td, ok := uuidTripDetectors[f.Properties.MustString("UUID")]
 			if !ok {
-				td = NewTripDetector(*flagTrackerInterval, *flagTrackerSpeedThreshold)
+				td = NewTripDetector(*flagTrackerInterval, *flagTrackerSpeedThreshold, *flagClusterDistanceThreshold)
 				uuidTripDetectors[f.Properties.MustString("UUID")] = td
 			}
 			if err := td.AddFeature(f); err != nil {
@@ -298,8 +299,8 @@ loop:
 			if err != nil {
 				log.Fatalln(err)
 			}
-			j = bytes.ReplaceAll(j, []byte("\n"), []byte(""))
 			j = bytes.ReplaceAll(j, []byte("\\n"), []byte(""))
+			j = bytes.ReplaceAll(j, []byte("\n"), []byte(""))
 			// j = append(j, []byte("\n")...)
 			// if _, err := os.Stdout.Write(j); err != nil {
 			// 	log.Fatalln(err)

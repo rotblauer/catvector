@@ -73,17 +73,17 @@ process() {
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
     | ${BUILD_TARGET} preprocess \
-    | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz"
-#    | tee >( \
-#      gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
-#        | ${BUILD_TARGET} --interval=120s points-to-linestrings \
-#        | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
-#        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
-#    ) \
-#    | tee >( \
-#      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
-#        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
-#    )
+    | ${BUILD_TARGET} --interval=120s --speed-threshold=0.5 --cluster-distance=50 trip-detector \
+    | tee >( \
+      gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
+        | ${BUILD_TARGET} --interval=120s points-to-linestrings \
+        | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
+        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
+    ) \
+    | tee >( \
+      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
+        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
+    )
 
   #    | ${BUILD_TARGET} --interval=60s laps-or-naps
   #    | tee >(
