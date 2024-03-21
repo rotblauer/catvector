@@ -248,7 +248,7 @@ func (t *PointTracker) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous bool
 	}
 
 	// Split any tracks separated by the INTERVAL in time.
-	if span := timespan(t.LastFeature(), f); span > *flagTrackerInterval || span < 0 {
+	if span := timespan(t.LastFeature(), f); span > *flagDwellInterval || span < 0 {
 		return true
 	}
 

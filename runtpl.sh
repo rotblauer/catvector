@@ -14,7 +14,7 @@ tippeargs=(
     --drop-smallest-as-needed
     --drop-densest-as-needed
     --minimum-zoom 3
-    --maximum-zoom 15 # 1me
+    --maximum-zoom 18 # 1me
 
 	# Keep these fields
     --include Name

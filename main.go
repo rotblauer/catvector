@@ -50,7 +50,8 @@ const (
 	earthCircumferenceDegreesPerMeter = 360 / earthCircumference
 )
 
-var flagTrackerInterval = flag.Duration("interval", 10*time.Second, "line detection interval")
+var flagDwellInterval = flag.Duration("dwell-interval", 10*time.Second, "stop detection interval")
+var flagTripStartInterval = flag.Duration("trip-start-interval", 30*time.Second, "start detection interval")
 var flagTrackerSpeedThreshold = flag.Float64("speed-threshold", 0.5, "speed threshold for trip detection")
 var flagClusterDistanceThreshold = flag.Float64("cluster-distance", 10.0, "cluster distance threshold for trip stops")
 
@@ -64,7 +65,7 @@ loop:
 		case f := <-featureCh:
 			tracker, ok := uuidTrackers[f.Properties["UUID"].(string)]
 			if !ok {
-				tracker = NewPointTracker(*flagTrackerInterval)
+				tracker = NewPointTracker(*flagDwellInterval)
 				uuidTrackers[f.Properties["UUID"].(string)] = tracker
 				go func() {
 					trackerWaiter.Add(1)
@@ -287,7 +288,7 @@ loop:
 			}
 			td, ok := uuidTripDetectors[f.Properties.MustString("UUID")]
 			if !ok {
-				td = NewTripDetector(*flagTrackerInterval, *flagTrackerSpeedThreshold, *flagClusterDistanceThreshold)
+				td = NewTripDetector(*flagDwellInterval, *flagTripStartInterval, *flagTrackerSpeedThreshold, *flagClusterDistanceThreshold)
 				uuidTripDetectors[f.Properties.MustString("UUID")] = td
 			}
 			if err := td.AddFeature(f); err != nil {

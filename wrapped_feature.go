@@ -67,10 +67,10 @@ func (f TracksGeoJSON) Timespan() time.Duration {
 	return f[len(f)-1].MustGetTime().Sub(f[0].MustGetTime())
 }
 
-func (f TracksGeoJSON) ReportedSpeeds(dwellLimit time.Time) []float64 {
+func (f TracksGeoJSON) ReportedSpeeds(startLimit time.Time) []float64 {
 	out := []float64{}
 	for i := f.Len() - 1; i >= 0; i-- {
-		if f[i].MustGetTime().Before(dwellLimit) {
+		if f[i].MustGetTime().Before(startLimit) {
 			break
 		}
 		out = append(out, f[i].MustGetSpeed())
