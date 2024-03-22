@@ -355,7 +355,8 @@ func urbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh chan st
 	errChan := make(chan error)
 	closeCh := make(chan struct{}, 1)
 
-	spuriousDistanceMeters := 100.0                // ! Wang says 200, but I got no hits with that on Rye in batch 42.
+	// ! Wang says 200, but I got no hits with that on Rye in batch 42.
+	spuriousDistanceMeters := *flagUrbanCanyonDistance
 	buffer, bufferSize := []*geojson.Feature{}, 11 // 11 = 5 + 1 + 5
 
 	go func() {
@@ -372,8 +373,8 @@ func urbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh chan st
 					continue
 				}
 				// If we've reached the buffer size, we can start processing.
+				// Truncate the buffer to the last 11 elements.
 				if len(buffer) > bufferSize {
-					// Truncate the buffer to the last 11 elements.
 					buffer = buffer[len(buffer)-bufferSize:]
 				}
 				// [inclusive:exclusive)
@@ -415,6 +416,8 @@ func urbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh chan st
 	}()
 	return featureChan, errChan, closeCh
 }
+
+var flagUrbanCanyonDistance = flag.Float64("urban-canyon-distance", 200.0, "urban canyon distance threshold")
 
 func cmdPreprocess() {
 	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, preProcessFilters)

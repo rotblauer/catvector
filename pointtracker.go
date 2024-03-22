@@ -251,7 +251,7 @@ func (t *PointTracker) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous bool
 	if span := timespan(t.LastFeature(), f); span > *flagDwellInterval || span < 0 {
 		return true
 	}
-	
+
 	// // If the activity type changes, we should start a new linestring.
 	// incumbent := activityMode(t.intervalFeatures)
 	// next := activityMode(append(t.intervalFeatures, f))
