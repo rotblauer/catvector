@@ -82,7 +82,7 @@ process() {
     ) \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
-        | ${BUILD_TARGET} --dwell-interval=120s --cluster-distance=20 consolidate-stops \
+        | ${BUILD_TARGET} --cluster-distance=40 consolidate-stops \
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
     )
 

@@ -30,6 +30,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/montanaflynn/stats"
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/geo"
 	"github.com/paulmach/orb/geojson"
 	"github.com/paulmach/orb/planar"
 	"github.com/paulmach/orb/simplify"
@@ -452,7 +453,6 @@ loop:
 }
 
 type StopConsolidator struct {
-	StopDurationThreshold time.Duration
 	StopDistanceThreshold float64
 	LastFeature           *geojson.Feature
 	Features              TracksGeoJSON
@@ -475,9 +475,8 @@ func (sc *StopConsolidator) NewStopPoint() TrackGeoJSON {
 	return TrackGeoJSON{stopPoint}
 }
 
-func NewStopConsolidator(stopDurationThreshold time.Duration, stopDistanceThreshold float64) *StopConsolidator {
+func NewStopConsolidator(stopDistanceThreshold float64) *StopConsolidator {
 	sc := &StopConsolidator{
-		StopDurationThreshold: stopDurationThreshold,
 		StopDistanceThreshold: stopDistanceThreshold,
 		stopPointN:            0,
 	}
@@ -528,9 +527,9 @@ func (sc *StopConsolidator) MergeStopPoint(f *geojson.Feature) {
 	// P50 and P99 are the p50 and p99 values of the points' distances, indicating the point density.
 	if len(sc.Features) < 2 {
 		sc.StopPoint.Geometry = f.Point()
-		sc.StopPoint.Feature.Properties["P50Dist"] = 0
-		sc.StopPoint.Feature.Properties["P99Dist"] = 0
-		sc.StopPoint.Feature.Properties["Area"] = 0
+		sc.StopPoint.Feature.Properties["P50Dist"] = 0.0
+		sc.StopPoint.Feature.Properties["P99Dist"] = 0.0
+		sc.StopPoint.Feature.Properties["Area"] = 0.0
 		return
 	}
 	lats, lngs := []float64{}, []float64{}
@@ -548,7 +547,7 @@ func (sc *StopConsolidator) MergeStopPoint(f *geojson.Feature) {
 
 	distances := []float64{}
 	for _, f := range sc.Features {
-		distances = append(distances, planar.Distance(center, f.Point()))
+		distances = append(distances, geo.Distance(center, f.Point()))
 	}
 	distP50, _ := stats.Percentile(distances, 50)
 	distP99, _ := stats.Percentile(distances, 99)
@@ -556,8 +555,7 @@ func (sc *StopConsolidator) MergeStopPoint(f *geojson.Feature) {
 	sc.StopPoint.Feature.Properties["P99Dist"] = distP99
 
 	mp := orb.MultiPoint(points)
-	_, area := planar.CentroidArea(mp.Bound())
-	sc.StopPoint.Feature.Properties["Area"] = area
+	sc.StopPoint.Feature.Properties["Area"] = geo.Area(mp.Bound())
 }
 
 // AddFeature adds a point feature to the StopConsolidator, a state machine.
@@ -575,16 +573,11 @@ func (sc *StopConsolidator) AddFeature(f *geojson.Feature) TrackGeoJSON {
 	}
 
 	// If the feature is not within the stop distance threshold, reset the state.
-	if planar.Distance(sc.StopPoint.Point(), f.Point()) > sc.StopDistanceThreshold {
+	if geo.Distance(sc.StopPoint.Point(), f.Point()) > sc.StopDistanceThreshold {
 		sc.Reset()
 		return sc.AddFeature(f)
 	}
 
-	// If the feature is not within the stop duration threshold, reset the state.
-	if mustGetTime(sc.StopPoint.Feature, "Time").Add(sc.StopDurationThreshold).Before(mustGetTime(f, "Time")) {
-		sc.Reset()
-		return sc.AddFeature(f)
-	}
 	sc.MergeStopPoint(f)
 	return sc.StopPoint
 }
@@ -624,7 +617,7 @@ loop:
 		case f := <-featureCh:
 			tracker, ok := uuidTrackers[f.Properties["UUID"].(string)]
 			if !ok {
-				tracker = NewStopConsolidator(*flagDwellInterval, *flagClusterDistanceThreshold)
+				tracker = NewStopConsolidator(*flagClusterDistanceThreshold)
 				uuidTrackers[f.Properties["UUID"].(string)] = tracker
 			}
 			stopPoint := tracker.AddFeature(f)
