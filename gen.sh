@@ -82,6 +82,7 @@ process() {
     ) \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
+        | ${BUILD_TARGET} --dwell-interval=120s --cluster-distance=20 consolidate-stops \
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
     )
 
@@ -152,6 +153,18 @@ main() {
 }
 main
 
+
+
+document() {
+cat <<EOF > /dev/null
 # rotblauer/cattracks-explorer
-# http://localhost:8080/public/?geojson=http://localhost:8000/rye/reference.fc.json,http://localhost:8000/rye/rkalman-linestrings-dp-stationary.fc.json
-# http://localhost:8080/public/?vector=http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf
+http://localhost:8080/public/?geojson=http://localhost:8000/rye/reference.fc.json,http://localhost:8000/rye/rkalman-linestrings-dp-stationary.fc.json
+http://localhost:8080/public/?vector=http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf
+
+http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf
+
+mbtileserver --port 3001 --cors '*' -d /home/ia/tdata/local/catvector/batch-042x --verbose --enable-fs-watch
+
+EOF
+
+}

@@ -12,7 +12,7 @@ LAYER_NAME=${3:-$(basename $OUTPUT_FILE .mbtiles)}
 tippeargs=(
     --maximum-tile-bytes 500000 # default 500000
     --cluster-densest-as-needed
-    --cluster-distance=10 # 1px
+    --cluster-distance=15 # 1px
     --calculate-feature-density
     --drop-rate 1
     --minimum-zoom 3
@@ -21,12 +21,21 @@ tippeargs=(
 	# Keep these fields
     --include Name
     --include Time
-    --include Duration
     --include StartTime
     --include UnixTime
     --include Activity
-    --include IsTrip
+    --include Accuracy
     --include Speed
+
+    --include IsTrip
+    --include Duration
+    -EDuration:sum
+    --include Count
+    -ECount:sum
+
+    --include P50Dist
+    --include P99Dist
+    --include Area
 
     --single-precision
 

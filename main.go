@@ -170,6 +170,9 @@ loop:
 	for {
 		select {
 		case f := <-featureCh:
+			if f == nil {
+				continue
+			}
 			j, err := f.MarshalJSON()
 			if err != nil {
 				log.Fatalln(err)
@@ -448,6 +451,203 @@ loop:
 	}
 }
 
+type StopConsolidator struct {
+	StopDurationThreshold time.Duration
+	StopDistanceThreshold float64
+	LastFeature           *geojson.Feature
+	Features              TracksGeoJSON
+	StopPoint             TrackGeoJSON
+	stopPointN            int
+}
+
+func (sc *StopConsolidator) NewStopPoint() TrackGeoJSON {
+	stopPoint := geojson.NewFeature(orb.Point{})
+	sc.stopPointN++
+	stopPoint.Properties = map[string]interface{}{
+		"ID":       sc.stopPointN,
+		"Time":     time.Time{},
+		"Duration": 0.0,
+		"Count":    0,
+		"MaxDist":  0.0,
+		"P50Dist":  0.0,
+		"P99Dist":  0.0,
+	}
+	return TrackGeoJSON{stopPoint}
+}
+
+func NewStopConsolidator(stopDurationThreshold time.Duration, stopDistanceThreshold float64) *StopConsolidator {
+	sc := &StopConsolidator{
+		StopDurationThreshold: stopDurationThreshold,
+		StopDistanceThreshold: stopDistanceThreshold,
+		stopPointN:            0,
+	}
+	sc.Features = TracksGeoJSON{}
+	sc.StopPoint = sc.NewStopPoint()
+	return sc
+}
+
+func (sc *StopConsolidator) Reset() {
+	sc.Features = TracksGeoJSON{}
+	sc.StopPoint = sc.NewStopPoint()
+}
+
+func (sc *StopConsolidator) MergeStopPoint(f *geojson.Feature) {
+	sc.Features = append(sc.Features, &TrackGeoJSON{f})
+	defer func() { sc.LastFeature = f }()
+
+	sc.StopPoint.Properties["Name"] = f.Properties.MustString("Name")
+	sc.StopPoint.Properties["UUID"] = f.Properties.MustString("UUID")
+	sc.StopPoint.Properties["Version"] = f.Properties.MustString("Version")
+
+	// TODO: Synthesize?
+	sc.StopPoint.Properties["Activity"] = f.Properties.MustString("Activity")
+	sc.StopPoint.Properties["Speed"] = f.Properties.MustFloat64("Speed")
+	sc.StopPoint.Properties["Elevation"] = f.Properties.MustFloat64("Elevation")
+	sc.StopPoint.Properties["Heading"] = f.Properties.MustFloat64("Heading")
+	sc.StopPoint.Properties["Accuracy"] = f.Properties.MustFloat64("Accuracy")
+
+	// Duration is the time between the first and last point in the stop.
+	// The first feature time difference will == 0, subsequent features will have a duration.
+	if sc.LastFeature != nil {
+		sc.StopPoint.Feature.Properties["Duration"] =
+			sc.StopPoint.Feature.Properties.MustFloat64("Duration") +
+				mustGetTime(f, "Time").Sub(mustGetTime(sc.LastFeature, "Time")).
+					Round(time.Second).Seconds()
+	} else {
+		sc.StopPoint.Feature.Properties["Duration"] = 0.0
+	}
+
+	// Merge the stop point.
+	// Time is the last time.
+	sc.StopPoint.Feature.Properties["Time"] = f.Properties.MustString("Time")
+
+	// Count is the number of points in the stop.
+	sc.StopPoint.Feature.Properties["Count"] = sc.StopPoint.Feature.Properties.MustInt("Count") + 1
+
+	// MaxDist is the distance of the furthest point from the center.
+	// P50 and P99 are the p50 and p99 values of the points' distances, indicating the point density.
+	if len(sc.Features) < 2 {
+		sc.StopPoint.Geometry = f.Point()
+		sc.StopPoint.Feature.Properties["P50Dist"] = 0
+		sc.StopPoint.Feature.Properties["P99Dist"] = 0
+		sc.StopPoint.Feature.Properties["Area"] = 0
+		return
+	}
+	lats, lngs := []float64{}, []float64{}
+	points := []orb.Point{}
+	for _, f := range sc.Features {
+		points = append(points, f.Point())
+		lats = append(lats, f.Point().Lat())
+		lngs = append(lngs, f.Point().Lon())
+	}
+	// Get the average lat/lng.
+	meanLat, _ := stats.Mean(lats)
+	meanLng, _ := stats.Mean(lngs)
+	center := orb.Point{meanLng, meanLat}
+	sc.StopPoint.Geometry = center
+
+	distances := []float64{}
+	for _, f := range sc.Features {
+		distances = append(distances, planar.Distance(center, f.Point()))
+	}
+	distP50, _ := stats.Percentile(distances, 50)
+	distP99, _ := stats.Percentile(distances, 99)
+	sc.StopPoint.Feature.Properties["P50Dist"] = distP50
+	sc.StopPoint.Feature.Properties["P99Dist"] = distP99
+
+	mp := orb.MultiPoint(points)
+	_, area := planar.CentroidArea(mp.Bound())
+	sc.StopPoint.Feature.Properties["Area"] = area
+}
+
+// AddFeature adds a point feature to the StopConsolidator, a state machine.
+// If the SC is empty, it will be initialized with the feature, and
+// we are assumed
+func (sc *StopConsolidator) AddFeature(f *geojson.Feature) TrackGeoJSON {
+	if len(sc.Features) == 0 {
+		sc.MergeStopPoint(f)
+		return sc.StopPoint
+	}
+	// If the feature is not chronological, reset the state.
+	if !mustGetTime(sc.LastFeature, "Time").Before(mustGetTime(f, "Time")) {
+		sc.Reset()
+		return sc.AddFeature(f)
+	}
+
+	// If the feature is not within the stop distance threshold, reset the state.
+	if planar.Distance(sc.StopPoint.Point(), f.Point()) > sc.StopDistanceThreshold {
+		sc.Reset()
+		return sc.AddFeature(f)
+	}
+
+	// If the feature is not within the stop duration threshold, reset the state.
+	if mustGetTime(sc.StopPoint.Feature, "Time").Add(sc.StopDurationThreshold).Before(mustGetTime(f, "Time")) {
+		sc.Reset()
+		return sc.AddFeature(f)
+	}
+	sc.MergeStopPoint(f)
+	return sc.StopPoint
+}
+
+// cmdConsolidateStops is a program which takes a stream of geojson point features
+// and outputs a stream of geojson point features with stops consolidated.
+// It clusters points into a single stop if they are within a certain time and space threshold.
+// The Time threshold parameter is reused from --dwell-time.
+// Any two points separated by this time are considered potential stops.
+// Any two consecutive points separated by 100m are likewise considered potential stops.
+// Successive points not meeting these conditions are grouped into a synthesized
+// STOP POINT. The synthesized Stop Point's coordinates are the centroid of the points.
+// The Stop Point will list Time and Duration as properties, where Time is the time of the last point,
+// and Duration is the time between the first and last point in the stop.
+// The Stop Point will also list the number of points in the stop as a property,
+// and the distance of the furthest point from the centroid, as well
+// as the p50 and p99 values of the points' distances, indicating the point density.
+// Point density might be interesting to explore later, potentially for use with other stuff,
+// like stop detection.
+func cmdConsolidateStops() {
+	uuidTrackers := map[string]*StopConsolidator{}
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, nil)
+	lastStop := TrackGeoJSON{}
+	flushPoint := func(feature *geojson.Feature) {
+		j, err := feature.MarshalJSON()
+		if err != nil {
+			log.Fatalln(err, spew.Sdump(feature))
+		}
+		j = append(j, []byte("\n")...)
+		if _, err := os.Stdout.Write(j); err != nil {
+			log.Fatalln(err)
+		}
+	}
+loop:
+	for {
+		select {
+		case f := <-featureCh:
+			tracker, ok := uuidTrackers[f.Properties["UUID"].(string)]
+			if !ok {
+				tracker = NewStopConsolidator(*flagDwellInterval, *flagClusterDistanceThreshold)
+				uuidTrackers[f.Properties["UUID"].(string)] = tracker
+			}
+			stopPoint := tracker.AddFeature(f)
+			if lastStop.Feature == nil {
+				lastStop = stopPoint
+			}
+
+			// If the last stop is not the same as the current stop, flush the last stop.
+			if lastStop.Feature.Properties.MustInt("ID") != stopPoint.Feature.Properties.MustInt("ID") {
+				flushPoint(lastStop.Feature)
+				lastStop = stopPoint
+			}
+		case err := <-errCh:
+			log.Println(err)
+		case <-closeCh:
+			for _, tracker := range uuidTrackers {
+				flushPoint(tracker.StopPoint.Feature)
+			}
+			break loop
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	command := flag.Arg(0)
@@ -475,6 +675,9 @@ func main() {
 		return
 	case "preprocess":
 		cmdPreprocess()
+		return
+	case "consolidate-stops":
+		cmdConsolidateStops()
 		return
 	default:
 		log.Fatalf("unknown command: %s", command)
@@ -751,8 +954,9 @@ func readStreamWithFeatureCallback(reader io.Reader, callback func(*geojson.Feat
 			}
 			pointFeature, err := geojson.UnmarshalFeature(read)
 			if err != nil {
-				errChan <- err
+				errChan <- fmt.Errorf("failed to unmarshal geojson: %w", err)
 			}
+			// Nil error tolerance.
 			if pointFeature == nil {
 				continue
 			}
@@ -760,11 +964,16 @@ func readStreamWithFeatureCallback(reader io.Reader, callback func(*geojson.Feat
 			if callback != nil {
 				out, err := callback(pointFeature)
 				if err != nil {
+					// If the callback returns an error,
+					// the error will be sent to the errors channel,
+					// and the next iteration will happen.
 					errChan <- err
 					continue
 				}
+				// We ONLY SEND THE FEATURE IF IT'S NOT NIL.
 				featureChan <- out
 			} else {
+				// No callback, send the feature.
 				featureChan <- pointFeature
 			}
 		}

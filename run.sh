@@ -17,15 +17,14 @@ main() {
 
     # Derive the trial file from the pre-generated batch_id-wildcard batch files.
     # Concat gz files.
-    local concatables="${HOME}/tdata/local/catvector/gen/${CAT_ONE}/valid/${batch_id}"
+    export CONCATS="${HOME}/tdata/local/catvector/gen/${CAT_ONE}/valid/${batch_id}"
 
     set -x
     mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
     >"${OUTPUT_REFERENCE}"
-    for f in "${concatables}"*; do
+    for f in "${CONCATS}"*; do
       cat "${f}" >>"${OUTPUT_REFERENCE}"
     done
-#    cat "${concatables}"* >>"${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
 
     local script_dir
