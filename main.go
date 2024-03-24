@@ -189,10 +189,10 @@ func featureMustBeLinestring(f *geojson.Feature) (*geojson.Feature, error) {
 	return f, nil
 }
 
-func cmdDouglasPeucker() {
+func cmdDouglasPeucker(i io.ReadCloser, o io.WriteCloser) {
 	log.Println("Douglas-Peucker simplification with threshold", *flagDouglasPeuckerThreshold)
 	simplifier := simplify.DouglasPeucker(*flagDouglasPeuckerThreshold)
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, featureMustBeLinestring)
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(i, featureMustBeLinestring)
 loop:
 	for {
 		select {
@@ -208,7 +208,7 @@ loop:
 				log.Fatalln(err)
 			}
 			j = append(j, []byte("\n")...)
-			if _, err := os.Stdout.Write(j); err != nil {
+			if _, err := o.Write(j); err != nil {
 				log.Fatalln(err)
 			}
 		case err := <-errCh:
@@ -278,14 +278,16 @@ func preProcessFilters(f *geojson.Feature) (*geojson.Feature, error) {
 	return f, nil
 }
 
-// urbanCanyonFilterStream removes spurious GPS readings caused by the urban canyon effect.
+var flagUrbanCanyonDistance = flag.Float64("urban-canyon-distance", 200.0, "urban canyon distance threshold")
+
+// wangUrbanCanyonFilterStream removes spurious GPS readings caused by the urban canyon effect.
 // > Wang: Third, GPS points away from
 // the adjacent points due to the signal shift caused by
 // blocking or ‘‘urban canyon’’ effect are also deleted. As
 // is shown in Figure 2, GPS points away from both the
 // before and after 5 points center for more than 200 m
 // should be considered as shift points.
-func urbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh chan struct{}) (chan *geojson.Feature, chan error, chan struct{}) {
+func wangUrbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh chan struct{}) (chan *geojson.Feature, chan error, chan struct{}) {
 	featureChan := make(chan *geojson.Feature)
 	errChan := make(chan error)
 	closeCh := make(chan struct{}, 1)
@@ -322,7 +324,7 @@ func urbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh chan st
 				// Find the centroid of the head.
 				headCenter, _ := planar.CentroidArea(orb.MultiPoint{head[0].Point(), head[1].Point(), head[2].Point(), head[3].Point(), head[4].Point()})
 				// If the distances from the target to the tail and head centroids are more than 200m, it's a shift point.
-				if planar.Distance(tailCenter, target.Point()) > spuriousDistanceMeters && planar.Distance(headCenter, target.Point()) > spuriousDistanceMeters {
+				if geo.Distance(tailCenter, target.Point()) > spuriousDistanceMeters && geo.Distance(headCenter, target.Point()) > spuriousDistanceMeters {
 					j, _ := json.Marshal(target)
 					errChan <- fmt.Errorf("urban canyon spurious point: %s", string(j))
 					continue
@@ -352,11 +354,9 @@ func urbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh chan st
 	return featureChan, errChan, closeCh
 }
 
-var flagUrbanCanyonDistance = flag.Float64("urban-canyon-distance", 200.0, "urban canyon distance threshold")
-
-func cmdPreprocess() {
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, preProcessFilters)
-	processedCh, procErrCh, doneCh := urbanCanyonFilterStream(featureCh, closeCh)
+func cmdPreprocess(i io.ReadCloser, o io.WriteCloser) {
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(i, preProcessFilters)
+	processedCh, procErrCh, doneCh := wangUrbanCanyonFilterStream(featureCh, closeCh)
 
 loop:
 	for {
@@ -370,7 +370,7 @@ loop:
 				log.Fatalln(err)
 			}
 			j = append(j, []byte("\n")...)
-			if _, err := os.Stdout.Write(j); err != nil {
+			if _, err := o.Write(j); err != nil {
 				log.Fatalln(err)
 			}
 		case err := <-errCh:
@@ -381,137 +381,6 @@ loop:
 			break loop
 		}
 	}
-}
-
-type StopConsolidator struct {
-	StopDistanceThreshold float64
-	LastFeature           *geojson.Feature
-	Features              TracksGeoJSON
-	StopPoint             TrackGeoJSON
-	stopPointN            int
-}
-
-func (sc *StopConsolidator) NewStopPoint() TrackGeoJSON {
-	stopPoint := geojson.NewFeature(orb.Point{})
-	sc.stopPointN++
-	stopPoint.Properties = map[string]interface{}{
-		"ID":       sc.stopPointN,
-		"Time":     time.Time{},
-		"Duration": 0.0,
-		"Count":    0,
-		"MaxDist":  0.0,
-		"P50Dist":  0.0,
-		"P99Dist":  0.0,
-	}
-	return TrackGeoJSON{stopPoint}
-}
-
-func NewStopConsolidator(stopDistanceThreshold float64) *StopConsolidator {
-	sc := &StopConsolidator{
-		StopDistanceThreshold: stopDistanceThreshold,
-		stopPointN:            0,
-	}
-	sc.Features = TracksGeoJSON{}
-	sc.StopPoint = sc.NewStopPoint()
-	return sc
-}
-
-func (sc *StopConsolidator) Reset() {
-	sc.Features = TracksGeoJSON{}
-	sc.StopPoint = sc.NewStopPoint()
-}
-
-func (sc *StopConsolidator) MergeStopPoint(f *geojson.Feature) {
-	sc.Features = append(sc.Features, &TrackGeoJSON{f})
-	defer func() { sc.LastFeature = f }()
-
-	sc.StopPoint.Properties["Name"] = f.Properties.MustString("Name")
-	sc.StopPoint.Properties["UUID"] = f.Properties.MustString("UUID")
-	sc.StopPoint.Properties["Version"] = f.Properties.MustString("Version")
-
-	// TODO: Synthesize?
-	sc.StopPoint.Properties["Activity"] = f.Properties.MustString("Activity")
-	sc.StopPoint.Properties["Speed"] = f.Properties.MustFloat64("Speed")
-	sc.StopPoint.Properties["Elevation"] = f.Properties.MustFloat64("Elevation")
-	sc.StopPoint.Properties["Heading"] = f.Properties.MustFloat64("Heading")
-	sc.StopPoint.Properties["Accuracy"] = f.Properties.MustFloat64("Accuracy")
-
-	// Duration is the time between the first and last point in the stop.
-	// The first feature time difference will == 0, subsequent features will have a duration.
-	if sc.LastFeature != nil {
-		sc.StopPoint.Feature.Properties["Duration"] =
-			sc.StopPoint.Feature.Properties.MustFloat64("Duration") +
-				mustGetTime(f, "Time").Sub(mustGetTime(sc.LastFeature, "Time")).
-					Round(time.Second).Seconds()
-	} else {
-		sc.StopPoint.Feature.Properties["Duration"] = 0.0
-
-	}
-
-	// Merge the stop point.
-	// Time is the last time.
-	sc.StopPoint.Feature.Properties["Time"] = f.Properties.MustString("Time")
-
-	// Count is the number of points in the stop.
-	sc.StopPoint.Feature.Properties["Count"] = sc.StopPoint.Feature.Properties.MustInt("Count") + 1
-
-	// MaxDist is the distance of the furthest point from the center.
-	// P50 and P99 are the p50 and p99 values of the points' distances, indicating the point density.
-	if len(sc.Features) < 2 {
-		sc.StopPoint.Geometry = f.Point()
-		sc.StopPoint.Feature.Properties["P50Dist"] = 0.0
-		sc.StopPoint.Feature.Properties["P99Dist"] = 0.0
-		sc.StopPoint.Feature.Properties["Area"] = 0.0
-		return
-	}
-	lats, lngs := []float64{}, []float64{}
-	points := []orb.Point{}
-	for _, f := range sc.Features {
-		points = append(points, f.Point())
-		lats = append(lats, f.Point().Lat())
-		lngs = append(lngs, f.Point().Lon())
-	}
-	// Get the average lat/lng.
-	meanLat, _ := stats.Mean(lats)
-	meanLng, _ := stats.Mean(lngs)
-	center := orb.Point{meanLng, meanLat}
-	sc.StopPoint.Geometry = center
-
-	distances := []float64{}
-	for _, f := range sc.Features {
-		distances = append(distances, geo.Distance(center, f.Point()))
-	}
-	distP50, _ := stats.Percentile(distances, 50)
-	distP99, _ := stats.Percentile(distances, 99)
-	sc.StopPoint.Feature.Properties["P50Dist"] = distP50
-	sc.StopPoint.Feature.Properties["P99Dist"] = distP99
-
-	mp := orb.MultiPoint(points)
-	sc.StopPoint.Feature.Properties["Area"] = geo.Area(mp.Bound())
-}
-
-// AddFeature adds a point feature to the StopConsolidator, a state machine.
-// If the SC is empty, it will be initialized with the feature, and
-// we are assumed
-func (sc *StopConsolidator) AddFeature(f *geojson.Feature) TrackGeoJSON {
-	if len(sc.Features) == 0 {
-		sc.MergeStopPoint(f)
-		return sc.StopPoint
-	}
-	// If the feature is not chronological, reset the state.
-	if !mustGetTime(sc.LastFeature, "Time").Before(mustGetTime(f, "Time")) {
-		sc.Reset()
-		return sc.AddFeature(f)
-	}
-
-	// If the feature is not within the stop distance threshold, reset the state.
-	if geo.Distance(sc.StopPoint.Point(), f.Point()) > sc.StopDistanceThreshold {
-		sc.Reset()
-		return sc.AddFeature(f)
-	}
-
-	sc.MergeStopPoint(f)
-	return sc.StopPoint
 }
 
 // cmdConsolidateStops is a program which takes a stream of geojson point features
@@ -558,6 +427,7 @@ loop:
 			}
 
 			// If the last stop is not the same as the current stop, flush the last stop.
+			// The StopConsolidator has started to build a new stop.
 			if lastStop.Feature.Properties.MustInt("ID") != stopPoint.Feature.Properties.MustInt("ID") {
 				flushPoint(lastStop.Feature)
 				lastStop = stopPoint
@@ -580,27 +450,24 @@ func main() {
 	case "validate":
 		cmdValidate(os.Stdin, os.Stdout)
 		return
-	case "rkalman":
-		cmdRKalmanFilter()
-		return
-	case "points-to-linestrings":
-		cmdPointsToLineStrings(os.Stdin, os.Stdout)
+	case "preprocess":
+		cmdPreprocess(os.Stdin, os.Stdout)
 		return
 	case "trip-detector":
 		cmdTripDetector(os.Stdin, os.Stdout)
 		return
-	case "laps-or-naps":
-		cmdLapsOrNaps()
+	case "points-to-linestrings":
+		cmdPointsToLineStrings(os.Stdin, os.Stdout)
 		return
 	case "douglas-peucker":
-		cmdDouglasPeucker()
-		return
-	case "preprocess":
-		cmdPreprocess()
+		cmdDouglasPeucker(os.Stdin, os.Stdout)
 		return
 	case "consolidate-stops":
 		cmdConsolidateStops(os.Stdin, os.Stdout)
 		return
+	// case "rkalman":
+	// 	cmdRKalmanFilter()
+	// 	return
 	default:
 		log.Fatalf("unknown command: %s", command)
 	}
