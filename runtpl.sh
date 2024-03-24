@@ -19,10 +19,17 @@ tippeargs=(
 	# Keep these fields
     --include Name
     --include Time
-    --include Duration
     --include StartTime
     --include UnixTime
+
     --include Activity
+    --include PointCount
+    --include Duration
+    --include AverageAccuracy
+    --include DistanceTraversed
+    --include DistanceAbsolute
+    --include AverageReportedSpeed
+    --include AverageCalculatedSpeed
 
     --single-precision
 

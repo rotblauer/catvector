@@ -147,13 +147,6 @@ func getTraversedDistance(pointFeatures []*geojson.Feature) float64 {
 	return sum
 }
 
-func getActivityTypeForFeature(f *geojson.Feature) Activity {
-	if f.Properties["Activity"] == nil {
-		return TrackerStateUnknown
-	}
-	return ActivityFromReport(f.Properties["Activity"])
-}
-
 func calculatedAverageAccuracy(pointFeatures []*geojson.Feature) float64 {
 	if len(pointFeatures) == 0 {
 		return 0
@@ -174,7 +167,7 @@ func (t *LineStringBuilder) AddPointFeatureToLastLinestring(f *geojson.Feature) 
 		t.LineStringFeature.Properties[k] = v
 	}
 
-	t.LineStringFeature.Properties["NumberOfPoints"] = len(t.LineStringFeatures)
+	t.LineStringFeature.Properties["PointCount"] = len(t.LineStringFeatures)
 	t.LineStringFeature.Properties["Activity"] = activityModeNotUnknown(t.LineStringFeatures).String()
 	t.LineStringFeature.Properties["AverageAccuracy"] = calculatedAverageAccuracy(t.LineStringFeatures)
 	t.LineStringFeature.Properties["Duration"] = timespan(t.LineStringFeatures[0], f).Round(time.Second).Seconds()
@@ -182,32 +175,6 @@ func (t *LineStringBuilder) AddPointFeatureToLastLinestring(f *geojson.Feature) 
 	t.LineStringFeature.Properties["DistanceAbsolute"] = getAbsoluteDistance(t.LineStringFeatures)
 	t.LineStringFeature.Properties["AverageReportedSpeed"] = averageReportedSpeed(t.LineStringFeatures)
 	t.LineStringFeature.Properties["AverageCalculatedSpeed"] = calculatedAverageSpeedTraversed(t.LineStringFeatures)
-}
-
-func joinLinestrings(a, b *geojson.Feature) *geojson.Feature {
-	ls := orb.LineString{}
-	ls = append(ls, a.Geometry.(orb.LineString)...)
-	ls = append(ls, b.Geometry.(orb.LineString)...)
-	joined := geojson.NewFeature(ls)
-	joined.Properties = map[string]interface{}{}
-	for k, v := range a.Properties {
-		joined.Properties[k] = v
-	}
-	for k, v := range b.Properties {
-		joined.Properties[k] = v
-	}
-	joined.Properties["StartTime"] = a.Properties["StartTime"]
-	joined.Properties["Duration"] = a.Properties["Duration"].(float64) + b.Properties["Duration"].(float64)
-	joined.Properties["DistanceTraversed"] = a.Properties["DistanceTraversed"].(float64) + b.Properties["DistanceTraversed"].(float64)
-	joined.Properties["DistanceAbsolute"] = getAbsoluteDistance([]*geojson.Feature{a, b})
-	// For now, just return a weighted average of reported speeds.
-	joined.Properties["AverageReportedSpeed"] = (a.Properties["AverageReportedSpeed"].(float64)*a.Properties["NumberofPoints"].(float64) +
-		b.Properties["AverageReportedSpeed"].(float64)*b.Properties["NumberOfPoints"].(float64)) /
-		(a.Properties["NumberofPoints"].(float64) + b.Properties["NumberofPoints"].(float64))
-
-	joined.Properties["AverageCalculatedSpeed"] = calculatedAverageSpeedTraversedLinestring(joined)
-
-	return joined
 }
 
 func (t *LineStringBuilder) AddPointFeatureToNewLinestring(f *geojson.Feature) {
