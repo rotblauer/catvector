@@ -9,7 +9,7 @@ import (
 	"github.com/paulmach/orb/geojson"
 )
 
-type PointTracker struct {
+type LineStringBuilder struct {
 	Interval           time.Duration
 	LineStringFeature  *geojson.Feature
 	LineStringFeatures []*geojson.Feature // the points represented by the linestring
@@ -18,8 +18,8 @@ type PointTracker struct {
 	linestringsCh      chan *geojson.Feature
 }
 
-func NewPointTracker(interval time.Duration) *PointTracker {
-	return &PointTracker{
+func NewLineStringBuilder(interval time.Duration) *LineStringBuilder {
+	return &LineStringBuilder{
 		Interval:         interval,
 		lastNFeatures:    make([]*geojson.Feature, 0),
 		intervalFeatures: make([]*geojson.Feature, 0),
@@ -27,21 +27,21 @@ func NewPointTracker(interval time.Duration) *PointTracker {
 	}
 }
 
-func (t *PointTracker) LastFeature() *geojson.Feature {
+func (t *LineStringBuilder) LastFeature() *geojson.Feature {
 	if len(t.lastNFeatures) == 0 {
 		return nil
 	}
 	return t.lastNFeatures[len(t.lastNFeatures)-1]
 }
 
-func (t *PointTracker) Flush() {
+func (t *LineStringBuilder) Flush() {
 	if t.LineStringFeature != nil {
 		t.linestringsCh <- t.LineStringFeature
 	}
 	close(t.linestringsCh)
 }
 
-func (t *PointTracker) AddFeatureToState(f *geojson.Feature) {
+func (t *LineStringBuilder) AddFeatureToState(f *geojson.Feature) {
 	t.intervalFeatures = append(t.intervalFeatures, f)
 	for i := len(t.intervalFeatures) - 1; i > 0; i-- {
 		if timespan(t.intervalFeatures[i], f) > t.Interval {
@@ -56,7 +56,7 @@ func (t *PointTracker) AddFeatureToState(f *geojson.Feature) {
 	}
 }
 
-func (t *PointTracker) ResetState() {
+func (t *LineStringBuilder) ResetState() {
 	t.lastNFeatures = []*geojson.Feature{}
 	t.intervalFeatures = []*geojson.Feature{}
 }
@@ -165,7 +165,7 @@ func calculatedAverageAccuracy(pointFeatures []*geojson.Feature) float64 {
 	return sum / float64(len(pointFeatures))
 }
 
-func (t *PointTracker) AddPointFeatureToLastLinestring(f *geojson.Feature) {
+func (t *LineStringBuilder) AddPointFeatureToLastLinestring(f *geojson.Feature) {
 	t.LineStringFeature.Geometry = append(t.LineStringFeature.Geometry.(orb.LineString), f.Point())
 	t.LineStringFeatures = append(t.LineStringFeatures, f)
 
@@ -210,7 +210,7 @@ func joinLinestrings(a, b *geojson.Feature) *geojson.Feature {
 	return joined
 }
 
-func (t *PointTracker) AddPointFeatureToNewLinestring(f *geojson.Feature) {
+func (t *LineStringBuilder) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 	// Send the last linestring to the channel.
 	if t.LineStringFeature != nil && len(t.LineStringFeature.Geometry.(orb.LineString)) > 1 {
 		t.linestringsCh <- t.LineStringFeature
@@ -229,7 +229,7 @@ func (t *PointTracker) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 // IsDiscontinuous returns true if the last point is discontinuous from the previous interval.
 // According to some paper I found somewhere onetime, it's generally better
 // to break more than less. Trips/lines can then be synthesized later.
-func (t *PointTracker) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
+func (t *LineStringBuilder) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
 	if len(t.lastNFeatures) == 0 {
 		return true
 	}
@@ -262,7 +262,7 @@ func (t *PointTracker) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous bool
 	return false
 }
 
-func (t *PointTracker) AddPointFeature(f *geojson.Feature) {
+func (t *LineStringBuilder) AddPointFeature(f *geojson.Feature) {
 	if t.IsDiscontinuous(f) {
 		t.AddPointFeatureToNewLinestring(f)
 	} else {

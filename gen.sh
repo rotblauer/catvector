@@ -50,7 +50,7 @@ export -f intermediary_gzipping_to
 #   CAT_ONE
 #   OUTPUT_ROOT_CAT_ONE
 # Arguments:
-#  None
+#  batch_id
 #######################################
 process() {
   local batch_id
@@ -85,17 +85,6 @@ process() {
         | ${BUILD_TARGET} --dwell-distance=50 consolidate-stops \
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
     )
-
-  #    | ${BUILD_TARGET} --interval=60s laps-or-naps
-  #    | tee >(
-  #      gfilter --match-all "#(properties.IsMoving==true)" \
-  #        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz"
-  #    )
-  #    | tee >(
-  #      gfilter --match-all "#(properties.IsMoving==false)" \
-  #        | $BUILD_TARGET linestrings-to-points \
-  #        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz"
-  #    )
 
   mkdir -p "$(dirname "${completed_file}")" && date >"${completed_file}"
 }

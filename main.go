@@ -50,16 +50,90 @@ const (
 	earthCircumferenceDegreesPerMeter = 360 / earthCircumference
 )
 
+var errCoordinateOutOfRange = errors.New("coordinate out of range")
+
+func validatePointFeature(f *geojson.Feature) error {
+	if pt, ok := f.Geometry.(orb.Point); !ok {
+		return errors.New("not a point")
+	} else if pt.Lon() < -180 || pt.Lon() > 180 || pt.Lon() == 0 {
+		j, _ := json.MarshalIndent(f, "", "  ")
+		return fmt.Errorf("%w: longitude out of range: %f %s", errCoordinateOutOfRange, pt.Lon(), string(j))
+	} else if pt.Lat() < -90 || pt.Lat() > 90 || pt.Lat() == 0 {
+		j, _ := json.MarshalIndent(f, "", "  ")
+		return fmt.Errorf("%w: latitude out of range: %f %s", errCoordinateOutOfRange, pt.Lon(), string(j))
+	}
+
+	if _, ok := f.Properties["Time"]; !ok {
+		return errors.New("missing time")
+	}
+	t := mustGetTime(f, "Time")
+	if t.IsZero() {
+		return errors.New("invalid time")
+	}
+	if t.Before(time.Now().Add(-1 * time.Hour * 24 * 365 * 25)) {
+		return errors.New("time is too far in the past")
+	}
+	if _, ok := f.Properties["UUID"]; !ok {
+		return errors.New("missing UUID")
+	}
+	if _, ok := f.Properties["Name"]; !ok {
+		return errors.New("missing name")
+	}
+	if _, ok := f.Properties["Accuracy"]; !ok {
+		return errors.New("missing accuracy")
+	}
+	if _, ok := f.Properties["Elevation"]; !ok {
+		return errors.New("missing elevation")
+	}
+	if _, ok := f.Properties["Speed"]; !ok {
+		return errors.New("missing speed")
+	}
+	if _, ok := f.Properties["Heading"]; !ok {
+		return errors.New("missing heading")
+	}
+	return nil
+}
+
+func cmdValidate(i io.ReadCloser, o io.WriteCloser) {
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(i, func(f *geojson.Feature) (*geojson.Feature, error) {
+		if err := validatePointFeature(f); err != nil {
+			return nil, err
+		}
+		return f, nil
+	})
+loop:
+	for {
+		select {
+		case f := <-featureCh:
+			if f == nil {
+				continue
+			}
+			j, err := f.MarshalJSON()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			j = append(j, []byte("\n")...)
+			if _, err := o.Write(j); err != nil {
+				log.Fatalln(err)
+			}
+		case err := <-errCh:
+			log.Println(err)
+		case <-closeCh:
+			break loop
+		}
+	}
+}
+
 var flagDwellInterval = flag.Duration("dwell-interval", 10*time.Second, "stop detection interval")
 var flagTripStartInterval = flag.Duration("trip-start-interval", 30*time.Second, "start detection interval")
 var flagTrackerSpeedThreshold = flag.Float64("speed-threshold", 0.5, "speed threshold for trip detection")
 var flagDwellDistanceThresholdDefault = 10.0
 var flagDwellDistanceThreshold = flag.Float64("cluster-distance", flagDwellDistanceThresholdDefault, "cluster distance threshold for trip stops")
 
-func cmdPointsToLineStrings() {
+func cmdPointsToLineStrings(i io.ReadCloser, o io.WriteCloser) {
 	trackerWaiter := sync.WaitGroup{}
-	uuidTrackers := map[string]*PointTracker{}
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, nil)
+	uuidTrackers := map[string]*LineStringBuilder{}
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(i, nil)
 
 	writeMu := sync.Mutex{}
 	flushPointLocking := func(f *geojson.Feature) {
@@ -69,7 +143,7 @@ func cmdPointsToLineStrings() {
 		}
 		j = append(j, []byte("\n")...)
 		writeMu.Lock()
-		if _, err := os.Stdout.Write(j); err != nil {
+		if _, err := o.Write(j); err != nil {
 			log.Fatalln(err)
 		}
 		writeMu.Unlock()
@@ -80,29 +154,10 @@ loop:
 		case f := <-featureCh:
 			tracker, ok := uuidTrackers[f.Properties["UUID"].(string)]
 			if !ok {
-				tracker = NewPointTracker(*flagDwellInterval)
+				tracker = NewLineStringBuilder(*flagDwellInterval)
 				uuidTrackers[f.Properties["UUID"].(string)] = tracker
-				// FIXME:
-				/*
-					2024/03/24 08:11:38 main.go:634: failed to unmarshal geojson: invalid character 't' after object key:value pair
-					2024/03/24 08:13:24 WARN gfilter: invalid line JSON: ".48932647705078,\"Speed\":0,\"Time\":\"2023-04-08T19:22:34Z\",\"UUID\":\"05C63745-BFA3-4DE3-AF2F-CDE2173C0E11\",\"UnixTime\":1680981754,\"Version\":\"V.customizableCatTrackHat\"}}\n"
-					Processing category: rye, batch: 0007
-					2024/03/24 08:13:02 main.go:128: Douglas-Peucker simplification with threshold 8e-05
-					2024/03/24 08:13:03 WARN gfilter: invalid line JSON: "eed\":0,\"Time\":\"2023-04-11T16:02:16.999Z\",\"UUID\":\"05C63745-BFA3-4DE3-AF2F-CDE2173C0E11\",\"UnixTime\":1681228936,\"Version\":\"V.customizableCatTrackHat\"}}\n"
-					2024/03/24 08:13:03 main.go:634: failed to unmarshal geojson: invalid character 't' after object key
-					2024/03/24 08:13:09 main.go:634: failed to unmarshal geojson: invalid character 't' after object key:value pair
-					2024/03/24 08:13:19 pointtracker.go:241: WARN: feature not chronological, resetting tracker 2023-04-12 02:41:24 +0000 UTC 2023-04-12 02:43:12.255 +0000 UTC -1m48s
-					2024/03/24 08:14:26 WARN gfilter: invalid line JSON: ":1681339469,\"Version\":\"V.customizableCatTrackHat\"}}\n"
-					Processing category: rye, batch: 0006
-					2024/03/24 08:12:57 main.go:128: Douglas-Peucker simplification with threshold 8e-05
-					2024/03/24 08:12:57 WARN gfilter: invalid line JSON: "atTrackHat\"}}\n"
-					Processing category: rye, batch: 0008
-					2024/03/24 08:13:25 main.go:128: Douglas-Peucker simplification with threshold 8e-05
-					2024/03/24 08:13:28 main.go:634: failed to unmarshal geojson: invalid character '{' after object key:value pair
-				*/
-				// The async go routines are writing concurrently to stdout,
-				// interrupting each other's lines.
-				// The write operation should be held by a mutex or the streams should be independent.
+				// The write operation should be held by a mutex or the streams should be independent,
+				// otherwise the async go routines can interrupt each other's lines.
 				go func() {
 					trackerWaiter.Add(1)
 					defer trackerWaiter.Done()
@@ -125,98 +180,7 @@ loop:
 	trackerWaiter.Wait()
 }
 
-func cmdLinestringsToPoints() {
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, nil)
-loop:
-	for {
-		select {
-		case f := <-featureCh:
-			center := f.Geometry.(orb.LineString).Bound().Center()
-			point := geojson.NewFeature(orb.Point(center))
-			point.Properties = f.Properties
-			j, err := point.MarshalJSON()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			j = append(j, []byte("\n")...)
-			if _, err := os.Stdout.Write(j); err != nil {
-				log.Fatalln(err)
-			}
-		case err := <-errCh:
-			log.Println(err)
-		case <-closeCh:
-			break loop
-		}
-	}
-}
-
 var flagDouglasPeuckerThreshold = flag.Float64("threshold", 0.0001, "Douglas-Peucker epsilon threshold")
-
-func cmdDouglasPeucker() {
-	log.Println("Douglas-Peucker simplification with threshold", *flagDouglasPeuckerThreshold)
-	simplifier := simplify.DouglasPeucker(*flagDouglasPeuckerThreshold)
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
-		// The feature must be a linestring feature.
-		if _, ok := f.Geometry.(orb.LineString); !ok {
-			return nil, errors.New("not a linestring")
-		}
-		ls := geojson.LineString(f.Geometry.(orb.LineString))
-		simplerGeometry := simplifier.Simplify(ls.Geometry())
-		f.Geometry = simplerGeometry
-		return f, nil
-	})
-loop:
-	for {
-		select {
-		case f := <-featureCh:
-			if f == nil {
-				continue
-			}
-			j, err := f.MarshalJSON()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			j = append(j, []byte("\n")...)
-			if _, err := os.Stdout.Write(j); err != nil {
-				log.Fatalln(err)
-			}
-		case err := <-errCh:
-			log.Println(err)
-		case <-closeCh:
-			break loop
-		}
-	}
-}
-
-func cmdValidate() {
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, func(f *geojson.Feature) (*geojson.Feature, error) {
-		if err := validatePointFeature(f); err != nil {
-			return nil, err
-		}
-		return f, nil
-	})
-loop:
-	for {
-		select {
-		case f := <-featureCh:
-			if f == nil {
-				continue
-			}
-			j, err := f.MarshalJSON()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			j = append(j, []byte("\n")...)
-			if _, err := os.Stdout.Write(j); err != nil {
-				log.Fatalln(err)
-			}
-		case err := <-errCh:
-			log.Println(err)
-		case <-closeCh:
-			break loop
-		}
-	}
-}
 
 func featureMustBeLinestring(f *geojson.Feature) (*geojson.Feature, error) {
 	if _, ok := f.Geometry.(orb.LineString); !ok {
@@ -225,87 +189,34 @@ func featureMustBeLinestring(f *geojson.Feature) (*geojson.Feature, error) {
 	return f, nil
 }
 
-type LapperNapperTracker struct {
-	CurrentSpeed    float64
-	CurrentActivity Activity
-	CurrentLocation *geojson.Feature
-
-	CurrentFeature *geojson.Feature
-	FeatureCh      chan *geojson.Feature
-}
-
-func (t *LapperNapperTracker) AddLinestring(f *geojson.Feature) {
-	if t.CurrentFeature == nil {
-		t.CurrentSpeed = f.Properties["AverageReportedSpeed"].(float64)
-		t.CurrentActivity = ActivityFromReport(f.Properties["Activity"])
-		if f.Properties["Duration"].(float64) > 60 {
-			// Current location is last point of linestring
-			t.CurrentLocation = geojson.NewFeature(f.Geometry.(orb.LineString)[len(f.Geometry.(orb.LineString))-1])
-		} else {
-			// Current location is centroid of linestring
-			t.CurrentLocation = geojson.NewFeature(f.Geometry.(orb.LineString).Bound().Center())
-		}
-		t.CurrentFeature = f
-		return
-	}
-
-}
-
-func NewLapperNapperTracker() *LapperNapperTracker {
-	return &LapperNapperTracker{
-		FeatureCh: make(chan *geojson.Feature),
-	}
-}
-
-func (t *LapperNapperTracker) Flush() {
-	if t.CurrentFeature != nil {
-		t.FeatureCh <- t.CurrentFeature
-	}
-	close(t.FeatureCh)
-}
-
-// cmdLapsOrNaps is a program which takes a stream of geojson linestring features
-// and decides to either possibly join them (if moving, aka lapping), or to
-// convert them to points and possibly join them if napping.
-func cmdLapsOrNaps() {
-	waiter := sync.WaitGroup{}
-	uuidTrackers := map[string]*LapperNapperTracker{}
+func cmdDouglasPeucker() {
+	log.Println("Douglas-Peucker simplification with threshold", *flagDouglasPeuckerThreshold)
+	simplifier := simplify.DouglasPeucker(*flagDouglasPeuckerThreshold)
 	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, featureMustBeLinestring)
 loop:
 	for {
 		select {
 		case f := <-featureCh:
-			tracker, ok := uuidTrackers[f.Properties["UUID"].(string)]
-			if !ok {
-				tracker = NewLapperNapperTracker()
-				uuidTrackers[f.Properties["UUID"].(string)] = tracker
-				go func() {
-					waiter.Add(1)
-					defer waiter.Done()
-					for outFeature := range tracker.FeatureCh {
-						j, err := outFeature.MarshalJSON()
-						if err != nil {
-							log.Fatalln(err)
-						}
-						j = append(j, []byte("\n")...)
-						if _, err := os.Stdout.Write(j); err != nil {
-							log.Fatalln(err)
-						}
-					}
-				}()
+			if f == nil {
+				continue
 			}
-			tracker.AddLinestring(f)
+			ls := geojson.LineString(f.Geometry.(orb.LineString))
+			simplerGeometry := simplifier.Simplify(ls.Geometry())
+			f.Geometry = simplerGeometry
+			j, err := f.MarshalJSON()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			j = append(j, []byte("\n")...)
+			if _, err := os.Stdout.Write(j); err != nil {
+				log.Fatalln(err)
+			}
 		case err := <-errCh:
 			log.Println(err)
 		case <-closeCh:
-			// Iterate all trackers and flush them.
-			for _, tracker := range uuidTrackers {
-				tracker.Flush()
-			}
 			break loop
 		}
 	}
-	waiter.Wait()
 }
 
 func cmdTripDetector(i io.ReadCloser, o io.WriteCloser) {
@@ -333,15 +244,9 @@ loop:
 				log.Fatalln(err)
 			}
 			j = append(j, []byte("\n")...)
-			if _, err := os.Stdout.Write(j); err != nil {
+			if _, err := o.Write(j); err != nil {
 				log.Fatalln(err)
 			}
-			// if _, err := fmt.Fprintln(o, string(j)); err != nil {
-			// 	log.Fatalln(err)
-			// }
-			// if err := os.Stdout.Sync(); err != nil {
-			// 	log.Fatalln(err)
-			// }
 		case err := <-errCh:
 			log.Println(err)
 		case <-closeCh:
@@ -673,22 +578,19 @@ func main() {
 	command := flag.Arg(0)
 	switch command {
 	case "validate":
-		cmdValidate()
+		cmdValidate(os.Stdin, os.Stdout)
 		return
 	case "rkalman":
 		cmdRKalmanFilter()
 		return
 	case "points-to-linestrings":
-		cmdPointsToLineStrings()
+		cmdPointsToLineStrings(os.Stdin, os.Stdout)
 		return
 	case "trip-detector":
 		cmdTripDetector(os.Stdin, os.Stdout)
 		return
 	case "laps-or-naps":
 		cmdLapsOrNaps()
-		return
-	case "linestrings-to-points":
-		cmdLinestringsToPoints()
 		return
 	case "douglas-peucker":
 		cmdDouglasPeucker()
@@ -909,50 +811,6 @@ func (f *RKalmanFilterT) EstimateFromObservation(obs *geojson.Feature) (estimate
 	estimatedFeature.Properties["Accuracy"] = filterEstimate.HorizontalAccuracy
 
 	return estimatedFeature, nil
-}
-
-var errCoordinateOutOfRange = errors.New("coordinate out of range")
-
-func validatePointFeature(f *geojson.Feature) error {
-	if pt, ok := f.Geometry.(orb.Point); !ok {
-		return errors.New("not a point")
-	} else if pt.Lon() < -180 || pt.Lon() > 180 || pt.Lon() == 0 {
-		j, _ := json.MarshalIndent(f, "", "  ")
-		return fmt.Errorf("%w: longitude out of range: %f %s", errCoordinateOutOfRange, pt.Lon(), string(j))
-	} else if pt.Lat() < -90 || pt.Lat() > 90 || pt.Lat() == 0 {
-		j, _ := json.MarshalIndent(f, "", "  ")
-		return fmt.Errorf("%w: latitude out of range: %f %s", errCoordinateOutOfRange, pt.Lon(), string(j))
-	}
-
-	if _, ok := f.Properties["Time"]; !ok {
-		return errors.New("missing time")
-	}
-	t := mustGetTime(f, "Time")
-	if t.IsZero() {
-		return errors.New("invalid time")
-	}
-	if t.Before(time.Now().Add(-1 * time.Hour * 24 * 365 * 25)) {
-		return errors.New("time is too far in the past")
-	}
-	if _, ok := f.Properties["UUID"]; !ok {
-		return errors.New("missing UUID")
-	}
-	if _, ok := f.Properties["Name"]; !ok {
-		return errors.New("missing name")
-	}
-	if _, ok := f.Properties["Accuracy"]; !ok {
-		return errors.New("missing accuracy")
-	}
-	if _, ok := f.Properties["Elevation"]; !ok {
-		return errors.New("missing elevation")
-	}
-	if _, ok := f.Properties["Speed"]; !ok {
-		return errors.New("missing speed")
-	}
-	if _, ok := f.Properties["Heading"]; !ok {
-		return errors.New("missing heading")
-	}
-	return nil
 }
 
 func readStreamWithFeatureCallback(reader io.Reader, callback func(*geojson.Feature) (*geojson.Feature, error)) (chan *geojson.Feature, chan error, chan struct{}) {
