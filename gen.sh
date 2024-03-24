@@ -73,7 +73,7 @@ process() {
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
     | ${BUILD_TARGET} --urban-canyon-distance=100 preprocess \
-    | ${BUILD_TARGET} --dwell-interval=120s --trip-start-interval=30s --speed-threshold=0.5 --cluster-distance=50 trip-detector \
+    | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=50 --trip-start-interval=30s --speed-threshold=0.5 trip-detector \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
         | ${BUILD_TARGET} --dwell-interval=120s points-to-linestrings \
@@ -82,7 +82,7 @@ process() {
     ) \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
-        | ${BUILD_TARGET} --cluster-distance=40 consolidate-stops \
+        | ${BUILD_TARGET} --dwell-distance=50 consolidate-stops \
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
     )
 

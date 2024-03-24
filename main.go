@@ -54,7 +54,8 @@ const (
 var flagDwellInterval = flag.Duration("dwell-interval", 10*time.Second, "stop detection interval")
 var flagTripStartInterval = flag.Duration("trip-start-interval", 30*time.Second, "start detection interval")
 var flagTrackerSpeedThreshold = flag.Float64("speed-threshold", 0.5, "speed threshold for trip detection")
-var flagClusterDistanceThreshold = flag.Float64("cluster-distance", 10.0, "cluster distance threshold for trip stops")
+var flagDwellDistanceThresholdDefault = 10.0
+var flagDwellDistanceThreshold = flag.Float64("cluster-distance", flagDwellDistanceThresholdDefault, "cluster distance threshold for trip stops")
 
 func cmdPointsToLineStrings() {
 	trackerWaiter := sync.WaitGroup{}
@@ -292,7 +293,7 @@ loop:
 			}
 			td, ok := uuidTripDetectors[f.Properties.MustString("UUID")]
 			if !ok {
-				td = NewTripDetector(*flagDwellInterval, *flagTripStartInterval, *flagTrackerSpeedThreshold, *flagClusterDistanceThreshold)
+				td = NewTripDetector(*flagDwellInterval, *flagTripStartInterval, *flagTrackerSpeedThreshold, *flagDwellDistanceThreshold)
 				uuidTripDetectors[f.Properties.MustString("UUID")] = td
 			}
 			if err := td.AddFeature(f); err != nil {
