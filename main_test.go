@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -23,6 +24,31 @@ var testdataOutputRootPath = filepath.Join(testdataRootPath, "output")
 
 func readTestdataFile(geojsonFile string) (io.Reader, error) {
 	return os.Open(filepath.Join(testdataRootPath, geojsonFile))
+}
+
+func init() {
+	flagDwellDistanceThresholdDefault = 50.0
+}
+
+func TestCmdConsolidateStops(t *testing.T) {
+	// testdata/batch-0010.json.gz
+	cmd := exec.Command("zcat", "testdata/batch-0010.json.gz")
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	cmdTripDetector(stdout, w)
+	cmdConsolidateStops(r, os.Stderr)
+	if err := cmd.Wait(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestRKalmanFilter(t *testing.T) {
