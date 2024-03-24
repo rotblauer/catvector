@@ -15,7 +15,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -61,6 +60,20 @@ func cmdPointsToLineStrings() {
 	trackerWaiter := sync.WaitGroup{}
 	uuidTrackers := map[string]*PointTracker{}
 	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, nil)
+
+	writeMu := sync.Mutex{}
+	flushPointLocking := func(f *geojson.Feature) {
+		j, err := f.MarshalJSON()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		j = append(j, []byte("\n")...)
+		writeMu.Lock()
+		if _, err := os.Stdout.Write(j); err != nil {
+			log.Fatalln(err)
+		}
+		writeMu.Unlock()
+	}
 loop:
 	for {
 		select {
@@ -69,18 +82,32 @@ loop:
 			if !ok {
 				tracker = NewPointTracker(*flagDwellInterval)
 				uuidTrackers[f.Properties["UUID"].(string)] = tracker
+				// FIXME:
+				/*
+					2024/03/24 08:11:38 main.go:634: failed to unmarshal geojson: invalid character 't' after object key:value pair
+					2024/03/24 08:13:24 WARN gfilter: invalid line JSON: ".48932647705078,\"Speed\":0,\"Time\":\"2023-04-08T19:22:34Z\",\"UUID\":\"05C63745-BFA3-4DE3-AF2F-CDE2173C0E11\",\"UnixTime\":1680981754,\"Version\":\"V.customizableCatTrackHat\"}}\n"
+					Processing category: rye, batch: 0007
+					2024/03/24 08:13:02 main.go:128: Douglas-Peucker simplification with threshold 8e-05
+					2024/03/24 08:13:03 WARN gfilter: invalid line JSON: "eed\":0,\"Time\":\"2023-04-11T16:02:16.999Z\",\"UUID\":\"05C63745-BFA3-4DE3-AF2F-CDE2173C0E11\",\"UnixTime\":1681228936,\"Version\":\"V.customizableCatTrackHat\"}}\n"
+					2024/03/24 08:13:03 main.go:634: failed to unmarshal geojson: invalid character 't' after object key
+					2024/03/24 08:13:09 main.go:634: failed to unmarshal geojson: invalid character 't' after object key:value pair
+					2024/03/24 08:13:19 pointtracker.go:241: WARN: feature not chronological, resetting tracker 2023-04-12 02:41:24 +0000 UTC 2023-04-12 02:43:12.255 +0000 UTC -1m48s
+					2024/03/24 08:14:26 WARN gfilter: invalid line JSON: ":1681339469,\"Version\":\"V.customizableCatTrackHat\"}}\n"
+					Processing category: rye, batch: 0006
+					2024/03/24 08:12:57 main.go:128: Douglas-Peucker simplification with threshold 8e-05
+					2024/03/24 08:12:57 WARN gfilter: invalid line JSON: "atTrackHat\"}}\n"
+					Processing category: rye, batch: 0008
+					2024/03/24 08:13:25 main.go:128: Douglas-Peucker simplification with threshold 8e-05
+					2024/03/24 08:13:28 main.go:634: failed to unmarshal geojson: invalid character '{' after object key:value pair
+				*/
+				// The async go routines are writing concurrently to stdout,
+				// interrupting each other's lines.
+				// The write operation should be held by a mutex or the streams should be independent.
 				go func() {
 					trackerWaiter.Add(1)
 					defer trackerWaiter.Done()
 					for ls := range tracker.linestringsCh {
-						j, err := ls.MarshalJSON()
-						if err != nil {
-							log.Fatalln(err)
-						}
-						j = append(j, []byte("\n")...)
-						if _, err := os.Stdout.Write(j); err != nil {
-							log.Fatalln(err)
-						}
+						flushPointLocking(ls)
 					}
 				}()
 			}
@@ -281,9 +308,9 @@ loop:
 	waiter.Wait()
 }
 
-func cmdTripDetector() {
+func cmdTripDetector(i io.ReadCloser, o io.WriteCloser) {
 	uuidTripDetectors := map[string]*TripDetector{}
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, nil)
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(i, nil)
 loop:
 	for {
 		select {
@@ -305,15 +332,13 @@ loop:
 			if err != nil {
 				log.Fatalln(err)
 			}
-			j = bytes.ReplaceAll(j, []byte("\\n"), []byte(""))
-			j = bytes.ReplaceAll(j, []byte("\n"), []byte(""))
-			// j = append(j, []byte("\n")...)
-			// if _, err := os.Stdout.Write(j); err != nil {
-			// 	log.Fatalln(err)
-			// }
-			if _, err := fmt.Fprintln(os.Stdout, string(j)); err != nil {
+			j = append(j, []byte("\n")...)
+			if _, err := os.Stdout.Write(j); err != nil {
 				log.Fatalln(err)
 			}
+			// if _, err := fmt.Fprintln(o, string(j)); err != nil {
+			// 	log.Fatalln(err)
+			// }
 			// if err := os.Stdout.Sync(); err != nil {
 			// 	log.Fatalln(err)
 			// }
@@ -515,6 +540,7 @@ func (sc *StopConsolidator) MergeStopPoint(f *geojson.Feature) {
 					Round(time.Second).Seconds()
 	} else {
 		sc.StopPoint.Feature.Properties["Duration"] = 0.0
+
 	}
 
 	// Merge the stop point.
@@ -598,9 +624,9 @@ func (sc *StopConsolidator) AddFeature(f *geojson.Feature) TrackGeoJSON {
 // as the p50 and p99 values of the points' distances, indicating the point density.
 // Point density might be interesting to explore later, potentially for use with other stuff,
 // like stop detection.
-func cmdConsolidateStops() {
+func cmdConsolidateStops(i io.ReadCloser, o io.WriteCloser) {
 	uuidTrackers := map[string]*StopConsolidator{}
-	featureCh, errCh, closeCh := readStreamWithFeatureCallback(os.Stdin, nil)
+	featureCh, errCh, closeCh := readStreamWithFeatureCallback(i, nil)
 	lastStop := TrackGeoJSON{}
 	flushPoint := func(feature *geojson.Feature) {
 		j, err := feature.MarshalJSON()
@@ -608,7 +634,7 @@ func cmdConsolidateStops() {
 			log.Fatalln(err, spew.Sdump(feature))
 		}
 		j = append(j, []byte("\n")...)
-		if _, err := os.Stdout.Write(j); err != nil {
+		if _, err := o.Write(j); err != nil {
 			log.Fatalln(err)
 		}
 	}
@@ -618,7 +644,7 @@ loop:
 		case f := <-featureCh:
 			tracker, ok := uuidTrackers[f.Properties["UUID"].(string)]
 			if !ok {
-				tracker = NewStopConsolidator(*flagClusterDistanceThreshold)
+				tracker = NewStopConsolidator(*flagDwellDistanceThreshold)
 				uuidTrackers[f.Properties["UUID"].(string)] = tracker
 			}
 			stopPoint := tracker.AddFeature(f)
@@ -656,7 +682,7 @@ func main() {
 		cmdPointsToLineStrings()
 		return
 	case "trip-detector":
-		cmdTripDetector()
+		cmdTripDetector(os.Stdin, os.Stdout)
 		return
 	case "laps-or-naps":
 		cmdLapsOrNaps()
@@ -671,7 +697,7 @@ func main() {
 		cmdPreprocess()
 		return
 	case "consolidate-stops":
-		cmdConsolidateStops()
+		cmdConsolidateStops(os.Stdin, os.Stdout)
 		return
 	default:
 		log.Fatalf("unknown command: %s", command)
