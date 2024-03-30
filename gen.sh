@@ -72,7 +72,7 @@ process() {
     | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
-    | ${BUILD_TARGET} --urban-canyon-distance=100 preprocess \
+    | ${BUILD_TARGET} --urban-canyon-distance=200 preprocess \
     | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=50 --trip-start-interval=30s --speed-threshold=0.5 trip-detector \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
