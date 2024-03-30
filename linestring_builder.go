@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"time"
 
@@ -193,6 +194,8 @@ func (t *LineStringBuilder) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 	t.LineStringFeature.Properties["Duration"] = 0.0
 }
 
+var flagLinestringDisconinuityActivities = flag.Bool("linestring-discontinuity-activities", false, "If true, linestrings will be split on activity changes.")
+
 // IsDiscontinuous returns true if the last point is discontinuous from the previous interval.
 // According to some paper I found somewhere onetime, it's generally better
 // to break more than less. Trips/lines can then be synthesized later.
@@ -220,11 +223,13 @@ func (t *LineStringBuilder) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous
 	}
 
 	// // If the activity type changes, we should start a new linestring.
-	// incumbent := activityMode(t.intervalFeatures)
-	// next := activityMode(append(t.intervalFeatures, f))
-	// if !incumbent.IsContinuous(next) {
-	// 	return true
-	// }
+	if *flagLinestringDisconinuityActivities {
+		incumbent := activityMode(t.intervalFeatures)
+		next := activityMode(append(t.intervalFeatures, f))
+		if !incumbent.IsContinuous(next) {
+			return true
+		}
+	}
 
 	return false
 }
@@ -235,5 +240,9 @@ func (t *LineStringBuilder) AddPointFeature(f *geojson.Feature) {
 	} else {
 		t.AddPointFeatureToLastLinestring(f)
 	}
+	// When this function is called
+	// the feature is added to the LineStringBuilder's
+	// RAM, including the slice of features within configured
+	// (time) window and (length restricted) collection.
 	t.AddFeatureToState(f)
 }

@@ -7,7 +7,7 @@ main() {
   # - batch-023* stl, w-s, boone, denver
   # - batch-033* was for me missoula, glacier, to grandma's to buying the Ranger, ryne standard lake dodger
   # - batch-042* is a nice testdata batch, it includes RAGBRAI 2023.
-  local batch_id="batch-041"
+  local batch_id="batch-042"
   local kitty
   for kitty in ia rye; do
     export CAT_ONE="${kitty}"
