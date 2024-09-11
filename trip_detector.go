@@ -287,8 +287,8 @@ outer:
 		return nil
 	}
 
-	// NOOP: If we are still here, we are UNDECIDED.
-	// The TripDetector maintains its state invariantly.
+	// If we are here, we are UNDECIDED.
+	// The TripDetector maintains its state unchanged.
 
 	return nil
 }

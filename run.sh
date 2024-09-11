@@ -24,10 +24,22 @@ main() {
   # - batch-023* stl, w-s, boone, denver
   # - batch-033* was for me missoula, glacier, to grandma's to buying the Ranger, ryne standard lake dodger
   # - batch-042* is a nice testdata batch, it includes RAGBRAI 2023.
+  # ... Later. I assume these are batches from master. (Or direct-master.)
+  #     Shoulda nota.
+  #     Shoulda also nota the batch size.
   local batch_id="batch-044"
   local kitty
   for kitty in ia rye; do
     export CAT_ONE="${kitty}"
+
+    # FORK ALERT: Below are two forking chunks of code.
+    # They are different ways of establishing a reference data set.
+    # The first chunk is an evolution of tinkering with different batches
+    # derived, I assume, from master.json.gz. IIRC it evolved to look
+    # at subsets defined in batches from a pre-processed batching run
+    # on master.json.gz.
+    # The way I handle idempotency is sporadic and undocumented
+    # but surely seemed convenient and probably necessary at the time.
 
     # This chunk concatenates the batch files into a single reference file.
     # --------------------------------------------------
@@ -48,13 +60,18 @@ main() {
 #    { set +x; } 2>/dev/null
 
     # This chunk copies <edge.json.gz>.
+    # It
     # --------------------------------------------------
-    export OUTPUT_ROOT="$HOME/tdata/local/catvector/edge"
+    export OUTPUT_ROOT="$HOME/tdata/local/catvector/devop"
+    # OUTPUT_REFERENCE is a copy of the source data for some run.
+    # For data integrity and reproducibility.
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
     export TRACKS_SOURCE_GZ="${OUTPUT_REFERENCE}"
     set -x
     mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
-    cp "${HOME}/tdata/edge.json.gz" "${OUTPUT_REFERENCE}"
+
+    # Hardcode copy the original source data into our run's version of it.
+    cp "${HOME}/tdata/devop.json.gz" "${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
 
 
@@ -64,8 +81,8 @@ main() {
     script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
     set -x
-#    echo "Running ${script_dir}/gen.sh"
-#    time "${script_dir}/gen.sh"
+    echo "Running ${script_dir}/gen.sh"
+    time "${script_dir}/gen.sh"
 
     echo "Running ${script_dir}/tile.sh"
     time "${script_dir}/tile.sh"

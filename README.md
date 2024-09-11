@@ -1,5 +1,16 @@
 Turns cat tracks into cat vectors, ie. linestrings.
 
+This project is primarily intended to develop a trip detection pipeline.
+Trips are represented as linestrings, and non-trips (stops/visits/naps/pauses)
+can be represented as points.
+`cmdTripDetector` is the initial and, at the time of writing, the current state of the art.
+It was derived largely from some whitepapers I found on trip detection algorithms, and
+uses dwell time, dwell distance, and time between track points.
+Now, I'd like to pursue an experiment with "knots" for pause detection.
+How does Mike mark a down elk on the map? He walks a 10m circle around it, tying a knot in the line
+so he can identify it easily on a map. So maybe tracks with intersection/s occurring within some dwell
+time might be suggestive of "stops."
+
 
 
 
