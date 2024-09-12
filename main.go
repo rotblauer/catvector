@@ -238,6 +238,7 @@ loop:
 				log.Fatalln(err)
 			}
 			f.Properties["IsTrip"] = td.Tripping
+			f.Properties["MotionStateReason"] = td.MotionStateReason
 
 			j, err := json.Marshal(f)
 			if err != nil {

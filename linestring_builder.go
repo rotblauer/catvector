@@ -192,6 +192,7 @@ func (t *LineStringBuilder) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 	}
 	t.LineStringFeature.Properties["StartTime"] = f.Properties["Time"]
 	t.LineStringFeature.Properties["Duration"] = 0.0
+	t.LineStringFeature.Properties["MotionStateReason"] = f.Properties["MotionStateReason"]
 }
 
 var flagLinestringDisconinuityActivities = flag.Bool("linestring-discontinuity-activities", false, "If true, linestrings will be split on activity changes.")

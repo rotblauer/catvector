@@ -22,6 +22,7 @@ type TripDetector struct {
 	lastNPoints         TracksGeoJSON
 	intervalPoints      TracksGeoJSON
 	Tripping            bool
+	MotionStateReason   string // Why tripping was tripped or un-tripped.
 	StoppedLoc          orb.Point
 }
 
@@ -74,6 +75,7 @@ func (d *TripDetector) AddFeatureToState(f *geojson.Feature) {
 
 func (d *TripDetector) ResetState() {
 	d.Tripping = false
+	d.MotionStateReason = "reset"
 	d.StoppedLoc = orb.Point{}
 	d.lastNPoints = TracksGeoJSON{}
 	d.intervalPoints = TracksGeoJSON{}
@@ -87,6 +89,7 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 
 	defer func() {
 		if !d.Tripping {
+			// Update the d.StoppedLoc value to reflect the centroid of d.intervalPoints.
 			pts := []orb.Point{}
 			for _, p := range d.intervalPoints {
 				if p.MustGetTime().Before(t.MustGetTime().Add(-d.DwellTime)) {
@@ -143,6 +146,7 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 		if speed < d.SpeedThreshold {
 			// Real trip end flagged.
 			d.Tripping = false
+			d.MotionStateReason = "signal loss"
 			return nil
 		}
 	}
@@ -207,6 +211,7 @@ outer:
 	}
 	if dwellExceeded && maxDist <= d.StopClusterDistance {
 		d.Tripping = false
+		d.MotionStateReason = "point clustering"
 		return nil
 	}
 
@@ -284,6 +289,7 @@ outer:
 	}
 	if mean > d.SpeedThreshold {
 		d.Tripping = true
+		d.MotionStateReason = "reported speeds"
 		return nil
 	}
 

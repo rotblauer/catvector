@@ -76,6 +76,10 @@ func (sc *StopConsolidator) MergeStopPoint(f *geojson.Feature) {
 	sc.StopPoint.Properties["Heading"] = f.Properties.MustFloat64("Heading")
 	sc.StopPoint.Properties["Accuracy"] = f.Properties.MustFloat64("Accuracy")
 
+	if sc.StopPoint.Properties["MotionStateReason"] == nil {
+		sc.StopPoint.Properties["MotionStateReason"] = f.Properties.MustString("MotionStateReason")
+	}
+
 	// Duration is the time between the first and last point in the stop.
 	// The first feature time difference will == 0, subsequent features will have a duration.
 	if lastFeature != nil {
