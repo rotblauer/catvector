@@ -345,6 +345,7 @@ func (d *TripDetector) IsDetectStopPointClustering(f *geojson.Feature) (result d
 outer:
 	for i := len(d.intervalPoints) - 1; i >= 0; i-- {
 		p := d.intervalPoints[i]
+		// ...if the duration of the point clustering exceeds 120s...
 		if p.MustGetTime().Before(dwellStartMin) {
 			dwellExceeded = true
 			break
@@ -359,8 +360,6 @@ outer:
 			break outer
 		}
 	}
-	//speeds := d.intervalPoints.ReportedSpeeds(t.MustGetTime().Add(-d.DwellTime))
-	//reportedMeanSpeeds, _ := stats.Mean(stats.Float64Data(speeds))
 	if dwellExceeded && maxDist <= d.DwellDistance /* && reportedMeanSpeeds < d.SpeedThreshold */ {
 		return detectedStop
 	}
@@ -529,5 +528,5 @@ func (d *TripDetector) IsDetectStopReportedActivities(f *geojson.Feature) (resul
 	default:
 		panic("unhandled default case")
 	}
-	return detectedTrip
+	return detectedNeutral
 }
