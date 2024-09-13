@@ -1,14 +1,16 @@
 package main
 
 import (
+	"github.com/montanaflynn/stats"
 	"time"
 
-	"github.com/montanaflynn/stats"
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geo"
 	"github.com/paulmach/orb/geojson"
 	"github.com/paulmach/orb/planar"
 )
+
+const segmentBoundEpsilon = 1e-5
 
 // TripDetector normally takes Points and turns them into either a Trip or a Stop.
 // It is a state machine that takes in a series of points and returns a series of Trips and Stops.
@@ -22,8 +24,15 @@ type TripDetector struct {
 	lastNPoints         TracksGeoJSON
 	intervalPoints      TracksGeoJSON
 	Tripping            bool
-	MotionStateReason   string // Why tripping was tripped or un-tripped.
-	StoppedLoc          orb.Point
+
+	// MotionStateReason is a string that describes the reason for the current state of the TripDetector.
+	MotionStateReason string
+
+	// StoppedLoc is the centroid of the last N points when the TripDetector is in a stopped state.
+	// It is currently not used.
+	StoppedLoc orb.Point
+
+	segmentIntersectionGauge float64
 }
 
 func NewTripDetector(dwellTime, tripStartTime time.Duration, speedThreshold, stopClusterDistance float64) *TripDetector {
@@ -71,6 +80,9 @@ func (d *TripDetector) AddFeatureToState(f *geojson.Feature) {
 	for len(d.lastNPoints) > 10 {
 		d.lastNPoints = d.lastNPoints[1:]
 	}
+
+	// Degrade the segment intersection gauge.
+	d.segmentIntersectionGauge *= 0.9
 }
 
 func (d *TripDetector) ResetState() {
@@ -79,6 +91,90 @@ func (d *TripDetector) ResetState() {
 	d.StoppedLoc = orb.Point{}
 	d.lastNPoints = TracksGeoJSON{}
 	d.intervalPoints = TracksGeoJSON{}
+	d.segmentIntersectionGauge = 0
+}
+
+// segmentsIntersect returns true if the two line segments intersect.
+
+func segmentsIntersect(segA, segB orb.LineString) bool {
+
+	/*
+		// https://www.topcoder.com/thrive/articles/Geometry%20Concepts%20part%202:%20%20Line%20Intersection%20and%20its%20Applications#LineLineIntersection
+
+		aMax, aMin := segA.Bound().Max, segA.Bound().Min
+		a1 := aMax.Y() - aMin.Y()
+		b1 := aMin.X() - aMax.X()
+		c1 := a1*aMin.X() + b1*aMin.Y()
+
+		bMax, bMin := segB.Bound().Max, segB.Bound().Min
+		a2 := bMax.Y() - bMin.Y()
+		b2 := bMin.X() - bMax.X()
+		c2 := a2*bMin.X() + b2*bMin.Y()
+
+		det := a1*b2 - a2*b1
+		if det == 0 {
+			return false // parallel
+		}
+
+		// Derive the intersection point of the LINES.
+		iX := (b2*c1 - b1*c2) / det
+		iY := (a1*c2 - a2*c1) / det
+
+		// Return true if the intersection point of the LINES is within the BOUNDS of the SEGMENTS.
+		//return iX >= aMin.X() && iX <= aMax.X() && iY >= aMin.Y() && iY <= aMax.Y()
+		//return iX > aMin.X() && iX < aMax.X() && iY > aMin.Y() && iY < aMax.Y() // strict intersection (not at endpoints)
+		return iX < math.Max(aMin.X(), aMax.X()) && iX > math.Min(aMin.X(), aMax.X()) && iY < math.Max(aMin.Y(), aMax.Y()) && iY > math.Min(aMin.Y(), aMax.Y())
+	*/
+	/*
+		https://stackoverflow.com/a/1968345
+
+		// Returns 1 if the lines intersect, otherwise 0. In addition, if the lines
+		// intersect the intersection point may be stored in the floats i_x and i_y.
+		char get_line_intersection(float p0_x, float p0_y, float p1_x, float p1_y,
+		    float p2_x, float p2_y, float p3_x, float p3_y, float *i_x, float *i_y)
+		{
+		    float s1_x, s1_y, s2_x, s2_y;
+		    s1_x = p1_x - p0_x;     s1_y = p1_y - p0_y;
+		    s2_x = p3_x - p2_x;     s2_y = p3_y - p2_y;
+
+		    float s, t;
+		    s = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) / (-s2_x * s1_y + s1_x * s2_y);
+		    t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / (-s2_x * s1_y + s1_x * s2_y);
+
+		    if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
+		    {
+		        // Collision detected
+		        if (i_x != NULL)
+		            *i_x = p0_x + (t * s1_x);
+		        if (i_y != NULL)
+		            *i_y = p0_y + (t * s1_y);
+		        return 1;
+		    }
+
+		    return 0; // No collision
+		}
+	*/
+	p0_x, p0_y := segA[0][0], segA[0][1]
+	p1_x, p1_y := segA[1][0], segA[1][1]
+	p2_x, p2_y := segB[0][0], segB[0][1]
+	p3_x, p3_y := segB[1][0], segB[1][1]
+	var s1_x, s1_y, s2_x, s2_y float64
+	s1_x = p1_x - p0_x
+	s1_y = p1_y - p0_y
+	s2_x = p3_x - p2_x
+	s2_y = p3_y - p2_y
+	var s, t float64
+	s = (-s1_y*(p0_x-p2_x) + s1_x*(p0_y-p2_y)) / (-s2_x*s1_y + s1_x*s2_y)
+	t = (s2_x*(p0_y-p2_y) - s2_y*(p0_x-p2_x)) / (-s2_x*s1_y + s1_x*s2_y)
+	if s >= 0 && s <= 1 && t >= 0 && t <= 1 {
+		i_x := p0_x + (t * s1_x)
+		i_y := p0_y + (t * s1_y)
+		i := orb.Point{i_x, i_y}
+		if !segA.Bound().Min.Equal(i) && !segA.Bound().Max.Equal(i) {
+			return true
+		}
+	}
+	return false
 }
 
 // AddFeature takes a geojson.Feature and adds it to the state of the TripDetector.
@@ -152,6 +248,45 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 	}
 
 	/*
+		Experimental: identifying trip ends with track point segment intersections.
+		When knots are introduced to our lines, interpret this as a trip end.
+
+	*/
+
+	/*
+		dwellIntervalPts := d.IntervalPointsWhere(func(tt *TrackGeoJSON) bool {
+			return tt.MustGetTime().After(t.MustGetTime().Add(-d.DwellTime))
+		})
+
+		if len(dwellIntervalPts) > 0 {
+			currentSegment := orb.LineString{
+				dwellIntervalPts[len(dwellIntervalPts)-1].Point(),
+				t.Point(),
+			}
+
+			for i := len(dwellIntervalPts) - 1; i > 0; i-- {
+				segment := orb.LineString{dwellIntervalPts[i-1].Point(), dwellIntervalPts[i].Point()}
+				if segmentsIntersect(segment, currentSegment) {
+					d.segmentIntersectionGauge += 1.0
+					//break
+				}
+			}
+		}
+
+		// If 10% or more of the segments intersect, we are stopped.
+		if d.segmentIntersectionGauge > float64(len(dwellIntervalPts))*0.8 {
+			d.Tripping = false
+			d.MotionStateReason = "segment intersections"
+			return nil
+		}
+	*/
+
+	/*
+		d.Tripping = true
+		d.MotionStateReason = "default"
+	*/
+
+	/*
 		Identifying trip ends during normal GPS recording...
 
 		During
@@ -209,7 +344,9 @@ outer:
 			}
 		}
 	}
-	if dwellExceeded && maxDist <= d.StopClusterDistance {
+	//speeds := d.intervalPoints.ReportedSpeeds(t.MustGetTime().Add(-d.DwellTime))
+	//reportedMeanSpeeds, _ := stats.Mean(stats.Float64Data(speeds))
+	if dwellExceeded && maxDist <= d.StopClusterDistance /* && reportedMeanSpeeds < d.SpeedThreshold */ {
 		d.Tripping = false
 		d.MotionStateReason = "point clustering"
 		return nil
@@ -274,9 +411,9 @@ outer:
 	// 	}
 	// }
 
-	// // Get the average reported speed from all the points in the interval.
-	// // Get the average geo-calculated speed from all the points in the interval.
-	// // Weight the reported speed 80% and the calculated speed 20%.
+	// Get the average reported speed from all the points in the interval.
+	// Get the average geo-calculated speed from all the points in the interval.
+	// Weight the reported speed 80% and the calculated speed 20%.
 	referenceSpeeds := d.intervalPoints.ReportedSpeeds(t.MustGetTime().Add(-d.TripStartTime))
 	if len(referenceSpeeds) == 0 {
 		return nil

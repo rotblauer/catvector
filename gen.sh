@@ -73,10 +73,10 @@ process() {
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
     | ${BUILD_TARGET} --urban-canyon-distance=200 preprocess \
-    | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=50 --trip-start-interval=30s --speed-threshold=0.5 trip-detector \
+    | ${BUILD_TARGET} --dwell-interval=60s --dwell-distance=25 --trip-start-interval=30s --speed-threshold=0.5 trip-detector \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
-        | ${BUILD_TARGET} --dwell-interval=120s points-to-linestrings \
+        | ${BUILD_TARGET} --dwell-interval=60s points-to-linestrings \
         | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
     ) \
