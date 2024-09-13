@@ -54,7 +54,7 @@ export -f intermediary_gzipping_to
 #######################################
 process() {
   local batch_id
-  printf -v batch_id "%04d" "${1}"
+  printf -v batch_id "%05d" "${1}"
   [[ -z "${CAT_ONE}" ]] && echo "CAT_ONE is not set" && exit 1
   [[ -z "${OUTPUT_ROOT_CAT_ONE}" ]] && echo "OUTPUT_ROOT_CAT_ONE is not set" && exit 1
   [[ -z "${BUILD_TARGET}" ]] && echo "BUILD_TARGET is not set" && exit 1
