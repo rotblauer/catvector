@@ -81,7 +81,7 @@ process() {
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
     ) \
     | tee >( \
-      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
+      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false),#(properties.MotionStateReason!="reset")' \
         | ${BUILD_TARGET} --dwell-distance=100 consolidate-stops \
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
     )
