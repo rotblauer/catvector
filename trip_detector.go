@@ -464,7 +464,7 @@ func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result dete
 		for i := len(dwellIntervalPts) - 1; i > 0; i-- {
 			segment := orb.LineString{dwellIntervalPts[i-1].Point(), dwellIntervalPts[i].Point()}
 			if segmentsIntersect(segment, currentSegment) {
-				d.segmentIntersectionGauge += 0.25
+				d.segmentIntersectionGauge += 0.025
 				//break
 			}
 		}
