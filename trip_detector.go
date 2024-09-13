@@ -207,41 +207,13 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 		return nil
 	}
 
-	// From here, last is assuredly non-nil.
-
-	/*
-			Identifying trip ends with signal loss.
-
-			The dwell time is most frequently used in the existing researches to infer
-			trip ends with signal loss. If the time difference between
-			two consecutive GPS points exceeds a certain threshold,
-		 	we suppose that a potential trip end will occur.
-			Based on the previous studies, 120 s is usually employed
-			to represent the minimum time gap that an activity
-			would reasonably take place. We select GPS records
-			with time difference for more than 120 s as the potential
-			trip ends. As has been mentioned before, signal loss
-			generally occurs due to the signal blocking when volunteers
-			are in the indoor buildings or underground. To
-			remove the pseudo trip ends, we compare the average
-			speed of the signal loss segment (equal to the distance
-			traveled divided by time length of the signal loss period)
-			with the lower bound of walking with 0.5 m/s. If the
-			average speed of the signal loss segment is less than this
-			value, then a real trip end is flagged, while if not, we
-			consider it as the pseudo one and remove it.
-	*/
-	if dwell := t.MustGetTime().Sub(last.MustGetTime()); dwell > d.DwellTime {
-
-		// To remove pseudo trip ends...
-		distance := geo.Distance(t.Point(), last.Point())
-		speed := distance / dwell.Seconds() // m/s
-		if speed < d.SpeedThreshold {
-			// Real trip end flagged.
-			d.Tripping = false
-			d.MotionStateReason = "signal loss"
-			return nil
-		}
+	// Short-circuit if signal loss is detected.
+	// The tracker went off or lost signal for an appreciable length of time.
+	// A discontinuity by absence of record.
+	if d.IsDetectSignalLoss(f) {
+		d.Tripping = false
+		d.MotionStateReason = "signal loss"
+		return nil
 	}
 
 	weight := detectedNeutral
@@ -274,56 +246,6 @@ idRS: %v, idA: %v`,
 		return nil
 	}
 
-	/*
-		d.Tripping = true
-		d.MotionStateReason = "default"
-	*/
-
-	//if d.IsDetectStopPointClusteringCentroid(f) {
-	//	return nil
-	//}
-
-	/*
-		The above methods are used to identify the trip ends.
-		But how do we know when the trip starts?
-	*/
-
-	// links := []*geojson.Feature{}
-	// for i := len(d.intervalPoints); i > 0; i-- {
-	// 	var cur, ref *geojson.Feature
-	// 	ref = d.intervalPoints[i-1].Feature
-	// 	if i == len(d.intervalPoints) {
-	// 		cur = f
-	// 	} else {
-	// 		cur = d.intervalPoints[i].Feature
-	// 	}
-	// 	tt := &TrackGeoJSON{cur}
-	// 	if tt.MustGetTime().Before(dwellStartMin) {
-	// 		break
-	// 	}
-	// 	link := geojson.NewFeature(orb.LineString{ref.Point(), cur.Point()})
-	// 	links = append(links, link)
-	// }
-	// for i := 0; i < len(links); i++ {
-	// 	if i == 0 {
-	// 		continue
-	// 	}
-	// 	linkI := links[i]
-	// 	for j := 0; j < i; j++ {
-	// 		linkJ := links[j]
-	// 		bi := linkI.Geometry.(orb.LineString).Bound()
-	// 		bj := linkJ.Geometry.(orb.LineString).Bound()
-	// 		if bi.Intersects(bj) {
-	//
-	// 		}
-	// 	}
-	// 	overlap := geo.LineOverlap(links[i-1].Geometry.(orb.LineString), links[i].Geometry.(orb.LineString))
-	// 	if overlap > 50 {
-	// 		d.Tripping = false
-	// 		return nil
-	// 	}
-	// }
-
 	// If we are here, we are UNDECIDED.
 	// The TripDetector maintains its state unchanged.
 
@@ -337,6 +259,47 @@ const (
 	detectedNeutral detectedT = 0
 	detectedTrip    detectedT = 1
 )
+
+// IsDetectSignalLoss is a method that identifies trip ends with signal loss.
+/*
+		Identifying trip ends with signal loss.
+
+		The dwell time is most frequently used in the existing researches to infer
+		trip ends with signal loss. If the time difference between
+		two consecutive GPS points exceeds a certain threshold,
+	 	we suppose that a potential trip end will occur.
+		Based on the previous studies, 120 s is usually employed
+		to represent the minimum time gap that an activity
+		would reasonably take place. We select GPS records
+		with time difference for more than 120 s as the potential
+		trip ends. As has been mentioned before, signal loss
+		generally occurs due to the signal blocking when volunteers
+		are in the indoor buildings or underground. To
+		remove the pseudo trip ends, we compare the average
+		speed of the signal loss segment (equal to the distance
+		traveled divided by time length of the signal loss period)
+		with the lower bound of walking with 0.5 m/s. If the
+		average speed of the signal loss segment is less than this
+		value, then a real trip end is flagged, while if not, we
+		consider it as the pseudo one and remove it.
+*/
+func (d *TripDetector) IsDetectSignalLoss(f *geojson.Feature) (signalLossDetected bool) {
+	t := &TrackGeoJSON{f}
+
+	last := d.LastPointN(0)
+	if last == nil {
+		return false
+	}
+
+	if dwell := t.MustGetTime().Sub(last.MustGetTime()); dwell > d.DwellTime {
+		distance := geo.Distance(t.Point(), last.Point())
+		speed := distance / dwell.Seconds() // m/s
+		if speed < d.SpeedThreshold {
+			return true
+		}
+	}
+	return false
+}
 
 // IsDetectStopPointClustering is a method that identifies trip ends during normal GPS recording.
 /*
