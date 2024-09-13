@@ -62,7 +62,7 @@ main() {
     # This chunk copies <edge.json.gz>.
     # It
     # --------------------------------------------------
-    export OUTPUT_ROOT="$HOME/tdata/local/catvector/devop"
+    export OUTPUT_ROOT="$HOME/tdata/local/catvector/master"
     # OUTPUT_REFERENCE is a copy of the source data for some run.
     # For data integrity and reproducibility.
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
@@ -71,7 +71,7 @@ main() {
     mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
 
     # Hardcode copy the original source data into our run's version of it.
-    cp "${HOME}/tdata/devop.json.gz" "${OUTPUT_REFERENCE}"
+    cp "${HOME}/tdata/master.json.gz" "${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
 
 
@@ -81,8 +81,8 @@ main() {
     script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
     set -x
-    echo "Running ${script_dir}/gen.sh"
-    time "${script_dir}/gen.sh"
+#    echo "Running ${script_dir}/gen.sh"
+#    time "${script_dir}/gen.sh"
 
     echo "Running ${script_dir}/tile.sh"
     time "${script_dir}/tile.sh"

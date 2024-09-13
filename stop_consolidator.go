@@ -70,7 +70,11 @@ func (sc *StopConsolidator) MergeStopPoint(f *geojson.Feature) {
 	sc.StopPoint.Properties["Version"] = f.Properties.MustString("Version")
 
 	// TODO: Synthesize?
-	sc.StopPoint.Properties["Activity"] = f.Properties.MustString("Activity")
+	if act, ok := f.Properties["Activity"]; ok {
+		sc.StopPoint.Properties["Activity"] = act
+	} else {
+		sc.StopPoint.Properties["Activity"] = "Unknown"
+	}
 	sc.StopPoint.Properties["Speed"] = f.Properties.MustFloat64("Speed")
 	sc.StopPoint.Properties["Elevation"] = f.Properties.MustFloat64("Elevation")
 	sc.StopPoint.Properties["Heading"] = f.Properties.MustFloat64("Heading")

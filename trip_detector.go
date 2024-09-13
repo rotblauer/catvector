@@ -252,12 +252,12 @@ idRS: %v, idA: %v`,
 	return nil
 }
 
-type detectedT float64
+type DetectedT float64
 
 const (
-	detectedStop    detectedT = -1
-	detectedNeutral detectedT = 0
-	detectedTrip    detectedT = 1
+	detectedStop    DetectedT = -1
+	detectedNeutral DetectedT = 0
+	detectedTrip    DetectedT = 1
 )
 
 // IsDetectSignalLoss is a method that identifies trip ends with signal loss.
@@ -334,7 +334,7 @@ func (d *TripDetector) IsDetectSignalLoss(f *geojson.Feature) (signalLossDetecte
 	clustering exceeds 120 s; otherwise, it is treated as the
 	pseudo one and will be removed.
 */
-func (d *TripDetector) IsDetectStopPointClustering(f *geojson.Feature) (result detectedT) {
+func (d *TripDetector) IsDetectStopPointClustering(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	currentTime := t.MustGetTime()
@@ -366,7 +366,7 @@ outer:
 	return detectedTrip
 }
 
-func (d *TripDetector) IsDetectStopPointClusteringCentroid(f *geojson.Feature) (result detectedT) {
+func (d *TripDetector) IsDetectStopPointClusteringCentroid(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	dwellExceeded := false
@@ -398,7 +398,7 @@ func (d *TripDetector) IsDetectStopPointClusteringCentroid(f *geojson.Feature) (
 	Experimental: identifying trip ends with track point segment intersections.
 	When knots are introduced to our lines, interpret this as a trip end.
 */
-func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result detectedT) {
+func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	// Experimental: identifying trip ends with track point segment intersections.
@@ -427,7 +427,7 @@ func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result dete
 		}
 	}
 
-	return detectedT(d.segmentIntersectionGauge * float64(detectedStop))
+	return DetectedT(d.segmentIntersectionGauge * float64(detectedStop))
 }
 
 // IsDetectStopOverlaps is a method that identifies trip ends with track point segment overlaps.
@@ -446,7 +446,7 @@ func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result dete
 	50 m (considering the physical size of intersections in
 	Shanghai), a trip end is flagged.
 */
-func (d *TripDetector) IsDetectStopOverlaps(f *geojson.Feature) (result detectedT) {
+func (d *TripDetector) IsDetectStopOverlaps(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	// Experimental: identifying trip ends with track point segment intersections.
@@ -488,7 +488,7 @@ func (d *TripDetector) IsDetectStopOverlaps(f *geojson.Feature) (result detected
 				// Condition on rings at least half the standard size to avoid 'small' knots
 				// which can happen when wandering messy forests and urban canyons.
 				if ringLen > 25 {
-					return detectedT(math.Min(float64(ringLen)*0.02, 1.0)) * detectedStop
+					return DetectedT(math.Min(float64(ringLen)*0.02, 1.0)) * detectedStop
 				}
 			}
 		}
@@ -497,7 +497,7 @@ func (d *TripDetector) IsDetectStopOverlaps(f *geojson.Feature) (result detected
 	return detectedNeutral
 }
 
-func (d *TripDetector) IsDetectStopReportedSpeeds(f *geojson.Feature) (result detectedT) {
+func (d *TripDetector) IsDetectStopReportedSpeeds(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	referenceSpeeds := d.intervalPoints.ReportedSpeeds(t.MustGetTime().Add(-d.TripStartTime))
@@ -517,8 +517,16 @@ func (d *TripDetector) IsDetectStopReportedSpeeds(f *geojson.Feature) (result de
 	return detectedNeutral
 }
 
-func (d *TripDetector) IsDetectStopReportedActivities(f *geojson.Feature) (result detectedT) {
-	switch ActivityFromReport(f.Properties.MustString("Activity")) {
+func (d *TripDetector) IsDetectStopReportedActivities(f *geojson.Feature) (result DetectedT) {
+	activity, ok := f.Properties["Activity"]
+	if !ok {
+		return detectedNeutral
+	}
+	activityStr, ok := activity.(string)
+	if !ok {
+		return detectedNeutral
+	}
+	switch ActivityFromReport(activityStr) {
 	case TrackerStateStationary:
 		return detectedStop
 	case TrackerStateWalking, TrackerStateRunning, TrackerStateCycling, TrackerStateDriving:

@@ -344,8 +344,10 @@ func wangUrbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh cha
 				} else {
 					// Else we met the buffer size, but (always) the tailing 5 points get flushed
 					// without filtering because there are no tail points to compare them against.
-					for _, f := range buffer[6:] {
-						featureChan <- f
+					if len(buffer) > 6 {
+						for _, f := range buffer[6:] {
+							featureChan <- f
+						}
 					}
 				}
 				closeCh <- x
