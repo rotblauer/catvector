@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/montanaflynn/stats"
 	"github.com/paulmach/orb/planar"
+	"math"
 	"time"
 
 	"github.com/paulmach/orb"
@@ -103,7 +104,7 @@ func (d *TripDetector) ResetState() {
 
 // segmentsIntersect returns true if the two line segments intersect.
 
-func segmentsIntersect(segA, segB orb.LineString) bool {
+func segmentsIntersect(segA, segB orb.LineString) (intersect bool, x, y *float64) {
 
 	/*
 		// https://www.topcoder.com/thrive/articles/Geometry%20Concepts%20part%202:%20%20Line%20Intersection%20and%20its%20Applications#LineLineIntersection
@@ -180,10 +181,10 @@ func segmentsIntersect(segA, segB orb.LineString) bool {
 		// IsDetectStopIntersection is considered exclusive to the endpoints of a (either) segment.
 		// My use case is primarily contiguous segments.
 		if !segA.Bound().Min.Equal(i) && !segA.Bound().Max.Equal(i) {
-			return true
+			return true, &i_x, &i_y
 		}
 	}
-	return false
+	return false, nil, nil
 }
 
 // AddFeature takes a geojson.Feature and adds it to the state of the TripDetector.
@@ -248,13 +249,15 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 	idPCC := d.IsDetectStopPointClusteringCentroid(f)
 	idX := d.IsDetectStopIntersection(f)
 	idRS := d.IsDetectStopReportedSpeeds(f)
+	idO := d.IsDetectStopOverlaps(f)
 
-	d.MotionStateReason = fmt.Sprintf("idPC: %v, idPCC: %v, idX: %v, idRS: %v", idPC, idPCC, idX, idRS)
+	d.MotionStateReason = fmt.Sprintf("idPC: %v, idPCC: %v, idX: %v, idRS: %v, idO: %v", idPC, idPCC, idX, idRS, idO)
 
 	weight += idPC
 	weight += idPCC
 	weight += idX
 	weight += idRS
+	weight += idO
 
 	// TODO: tinker
 	if weight < detectedStop {
@@ -274,24 +277,6 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 	//if d.IsDetectStopPointClusteringCentroid(f) {
 	//	return nil
 	//}
-
-	/*
-		In addition, some short trip ends may take less than
-		2 min such as ‘‘picking up or dropping off somebody.’’
-		Most existing researches identify this type of trip end by
-		examining the change in direction to determine whether
-		there exists a trip end. However, only considering the
-		change in direction may misidentify turning at the inter-
-		sections as the trip ends. Actually, drivers usually take
-		the same road links before and after picking up/drop-
-		ping off somebody. Thus, we calculate the length of
-		overlapped links before and after an abrupt change in
-		direction. If the overlapped length exceeds the value of
-		50 m (considering the physical size of intersections in
-		Shanghai), a trip end is flagged.
-
-		TODO
-	*/
 
 	/*
 		The above methods are used to identify the trip ends.
@@ -463,7 +448,7 @@ func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result dete
 
 		for i := len(dwellIntervalPts) - 1; i > 0; i-- {
 			segment := orb.LineString{dwellIntervalPts[i-1].Point(), dwellIntervalPts[i].Point()}
-			if segmentsIntersect(segment, currentSegment) {
+			if x, _, _ := segmentsIntersect(segment, currentSegment); x {
 				d.segmentIntersectionGauge += 0.025
 				//break
 			}
@@ -471,6 +456,69 @@ func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result dete
 	}
 
 	return detectedT(d.segmentIntersectionGauge * float64(detectedStop))
+}
+
+// IsDetectStopOverlaps is a method that identifies trip ends with track point segment overlaps.
+/*
+	In addition, some short trip ends may take less than
+	2 min such as ‘‘picking up or dropping off somebody.’’
+	Most existing researches identify this type of trip end by
+	examining the change in direction to determine whether
+	there exists a trip end. However, only considering the
+	change in direction may misidentify turning at the inter-
+	sections as the trip ends. Actually, drivers usually take
+	the same road links before and after picking up/drop-
+	ping off somebody. Thus, we calculate the length of
+	overlapped links before and after an abrupt change in
+	direction. If the overlapped length exceeds the value of
+	50 m (considering the physical size of intersections in
+	Shanghai), a trip end is flagged.
+*/
+func (d *TripDetector) IsDetectStopOverlaps(f *geojson.Feature) (result detectedT) {
+	t := &TrackGeoJSON{f}
+
+	// Experimental: identifying trip ends with track point segment intersections.
+	// When knots are introduced to our lines, interpret this as a trip end.
+	dwellIntervalPts := d.IntervalPointsWhere(func(tt *TrackGeoJSON) bool {
+		return tt.MustGetTime().After(t.MustGetTime().Add(-d.DwellTime))
+	})
+
+	if len(dwellIntervalPts) > 0 {
+		currentSegment := orb.LineString{
+			dwellIntervalPts[len(dwellIntervalPts)-1].Point(),
+			t.Point(),
+		}
+
+		for i := len(dwellIntervalPts) - 1; i > 0; i-- {
+			segment := orb.LineString{dwellIntervalPts[i-1].Point(), dwellIntervalPts[i].Point()}
+
+			// I want the length of the segment on the linestring between the intersection.
+			// It's a ring.
+			ringLen := 0.0
+			if x, _, _ := segmentsIntersect(segment, currentSegment); x {
+
+				// We were stepping backwards through the dwell-interval points.
+				// Now we're going to walk foraward through it, since we know
+				// that the points are chronological and all points between 'then' and 'now'
+				// are considered part of a self-overlapping segment; a knot.
+				// We want to know: How long is the loop in the knot?
+				for j := i; j < len(dwellIntervalPts); j++ {
+					ringLen += geo.Distance(dwellIntervalPts[j-1].Point(), dwellIntervalPts[j].Point())
+					// Note that this overcounts the length by the distance between the intersection and the first point
+					// and the distance from the intersection and the last point,
+					// which is probably about the length of an average segment.
+					// Since I'm working in the context of about 120s dwell intervals
+					// and 1pt/second GPS records, this seems fine.
+				}
+
+				// We weight the documented 50 meter standard by the length of the ring.
+				// A 50m ring returns '-1', but larger rings will not return greater values.
+				return detectedT(math.Min(float64(ringLen)*0.02, 1.0)) * detectedStop
+			}
+		}
+	}
+
+	return detectedNeutral
 }
 
 func (d *TripDetector) IsDetectStopReportedSpeeds(f *geojson.Feature) (result detectedT) {
