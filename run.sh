@@ -76,13 +76,12 @@ main() {
 
 
     ## Run the scripts.
-
     local script_dir
     script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
     set -x
-#    echo "Running ${script_dir}/gen.sh"
-#    time "${script_dir}/gen.sh"
+    echo "Running ${script_dir}/gen.sh"
+    time "${script_dir}/gen.sh"
 
     echo "Running ${script_dir}/tile.sh"
     time "${script_dir}/tile.sh"
