@@ -250,14 +250,19 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 	idX := d.IsDetectStopIntersection(f)
 	idRS := d.IsDetectStopReportedSpeeds(f)
 	idO := d.IsDetectStopOverlaps(f)
+	idA := d.IsDetectStopReportedActivities(f)
 
-	d.MotionStateReason = fmt.Sprintf("idPC: %v, idPCC: %v, idX: %v, idRS: %v, idO: %v", idPC, idPCC, idX, idRS, idO)
+	d.MotionStateReason = fmt.Sprintf(`idPC: %v, idPCC: %v,
+idX: %v, idO: %v, 
+idRS: %v, idA: %v`,
+		idPC, idPCC, idX, idO, idRS, idA)
 
 	weight += idPC
 	weight += idPCC
 	weight += idX
 	weight += idRS
 	weight += idO
+	weight += idA
 
 	// TODO: tinker
 	if weight < detectedStop {
@@ -449,7 +454,12 @@ func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result dete
 		for i := len(dwellIntervalPts) - 1; i > 0; i-- {
 			segment := orb.LineString{dwellIntervalPts[i-1].Point(), dwellIntervalPts[i].Point()}
 			if x, _, _ := segmentsIntersect(segment, currentSegment); x {
-				d.segmentIntersectionGauge += 0.025
+				// A hard delta value of 0.025 seemed to work decently.
+				// Experimenting with an estimated normal 100-120 points in the dwellInterval
+				// to approximate this, we can estimate the delta as 1/100 = 0.01.
+				delta := 1.0 / float64(len(dwellIntervalPts))
+				delta = math.Min(delta, 0.025)
+				d.segmentIntersectionGauge += delta
 				//break
 			}
 		}
@@ -513,7 +523,11 @@ func (d *TripDetector) IsDetectStopOverlaps(f *geojson.Feature) (result detected
 
 				// We weight the documented 50 meter standard by the length of the ring.
 				// A 50m ring returns '-1', but larger rings will not return greater values.
-				return detectedT(math.Min(float64(ringLen)*0.02, 1.0)) * detectedStop
+				// Condition on rings at least half the standard size to avoid 'small' knots
+				// which can happen when wandering messy forests and urban canyons.
+				if ringLen > 25 {
+					return detectedT(math.Min(float64(ringLen)*0.02, 1.0)) * detectedStop
+				}
 			}
 		}
 	}
@@ -539,4 +553,18 @@ func (d *TripDetector) IsDetectStopReportedSpeeds(f *geojson.Feature) (result de
 		return detectedStop
 	}
 	return detectedNeutral
+}
+
+func (d *TripDetector) IsDetectStopReportedActivities(f *geojson.Feature) (result detectedT) {
+	switch ActivityFromReport(f.Properties.MustString("Activity")) {
+	case TrackerStateStationary:
+		return detectedStop
+	case TrackerStateWalking, TrackerStateRunning, TrackerStateCycling, TrackerStateDriving:
+		return detectedTrip
+	case TrackerStateUnknown:
+		return detectedNeutral
+	default:
+		panic("unhandled default case")
+	}
+	return detectedTrip
 }
