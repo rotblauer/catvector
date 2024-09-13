@@ -139,6 +139,7 @@ func cmdPointsToLineStrings(i io.ReadCloser, o io.WriteCloser) {
 	flushPointLocking := func(f *geojson.Feature) {
 		j, err := f.MarshalJSON()
 		if err != nil {
+			log.Println(spew.Sdump(f))
 			log.Fatalln(err)
 		}
 		j = append(j, []byte("\n")...)

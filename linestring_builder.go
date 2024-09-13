@@ -81,8 +81,8 @@ func calculatedAverageSpeedTraversed(pointFeatures []*geojson.Feature) float64 {
 		return 0
 	}
 	sum := 0.0
-	for i := 1; i < len(pointFeatures); i++ {
-		sum += calculatedAverageSpeedAbsolute(pointFeatures[i-1 : i+1])
+	for i := 1; i <= len(pointFeatures)-1; i++ {
+		sum += calculatedAverageSpeedAbsolute(pointFeatures[i-1 : i])
 	}
 	return sum / float64(len(pointFeatures))
 }
