@@ -11,7 +11,9 @@ How does Mike mark a down elk on the map? He walks a 10m circle around it, tying
 so he can identify it easily on a map. So maybe tracks with intersection/s occurring within some dwell
 time might be suggestive of "stops."
 
-
+Use __cattracks-explorer__ to visualize the generated data.
+- http://localhost:8080/public/?vector=http://localhost:3001/services/ia/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf
+- http://localhost:8080/public/?vector=http://localhost:3001/services/rye/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf
 
 
 
