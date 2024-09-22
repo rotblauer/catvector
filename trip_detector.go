@@ -103,36 +103,7 @@ func (d *TripDetector) ResetState() {
 }
 
 // segmentsIntersect returns true if the two line segments intersect.
-
 func segmentsIntersect(segA, segB orb.LineString) (intersect bool, x, y *float64) {
-
-	/*
-		// https://www.topcoder.com/thrive/articles/Geometry%20Concepts%20part%202:%20%20Line%20Intersection%20and%20its%20Applications#LineLineIntersection
-
-		aMax, aMin := segA.Bound().Max, segA.Bound().Min
-		a1 := aMax.Y() - aMin.Y()
-		b1 := aMin.X() - aMax.X()
-		c1 := a1*aMin.X() + b1*aMin.Y()
-
-		bMax, bMin := segB.Bound().Max, segB.Bound().Min
-		a2 := bMax.Y() - bMin.Y()
-		b2 := bMin.X() - bMax.X()
-		c2 := a2*bMin.X() + b2*bMin.Y()
-
-		det := a1*b2 - a2*b1
-		if det == 0 {
-			return false // parallel
-		}
-
-		// Derive the intersection point of the LINES.
-		iX := (b2*c1 - b1*c2) / det
-		iY := (a1*c2 - a2*c1) / det
-
-		// Return true if the intersection point of the LINES is within the BOUNDS of the SEGMENTS.
-		//return iX >= aMin.X() && iX <= aMax.X() && iY >= aMin.Y() && iY <= aMax.Y()
-		//return iX > aMin.X() && iX < aMax.X() && iY > aMin.Y() && iY < aMax.Y() // strict intersection (not at endpoints)
-		return iX < math.Max(aMin.X(), aMax.X()) && iX > math.Min(aMin.X(), aMax.X()) && iY < math.Max(aMin.Y(), aMax.Y()) && iY > math.Min(aMin.Y(), aMax.Y())
-	*/
 	/*
 		https://stackoverflow.com/a/1968345
 
