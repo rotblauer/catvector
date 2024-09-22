@@ -76,13 +76,13 @@ process() {
     | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=15 --trip-start-interval=30s --speed-threshold=0.5 trip-detector \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
-        | ${BUILD_TARGET} --dwell-interval=60s points-to-linestrings \
+        | ${BUILD_TARGET} --dwell-interval=120s points-to-linestrings \
         | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
     ) \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==false),#(properties.MotionStateReason!="reset")' \
-        | ${BUILD_TARGET} --dwell-distance=100 consolidate-stops \
+        | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=100 consolidate-stops \
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
     )
 

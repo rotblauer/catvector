@@ -14,6 +14,9 @@ document() {
   by reducing the input to the program to a chapter, instead of the whole book.
 
   http://localhost:8080/public/?vector=http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/valid/tiles/{z}/{x}/{y}.pbf
+
+  20240915
+  http://localhost:8080/public/?vector=http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/valid/tiles/{z}/{x}/{y}.pbf
 EOF
 }
 
@@ -62,7 +65,7 @@ main() {
     # This chunk copies <edge.json.gz>.
     # It
     # --------------------------------------------------
-    export OUTPUT_ROOT="$HOME/tdata/local/catvector/master"
+    export OUTPUT_ROOT="$HOME/tdata/local/catvector/devop"
     # OUTPUT_REFERENCE is a copy of the source data for some run.
     # For data integrity and reproducibility.
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
@@ -71,7 +74,7 @@ main() {
     mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
 
     # Hardcode copy the original source data into our run's version of it.
-    cp "${HOME}/tdata/master.json.gz" "${OUTPUT_REFERENCE}"
+    cp "${HOME}/tdata/devop.json.gz" "${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
 
 
@@ -80,8 +83,8 @@ main() {
     script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
     set -x
-    echo "Running ${script_dir}/gen.sh"
-    time "${script_dir}/gen.sh"
+#    echo "Running ${script_dir}/gen.sh"
+#    time "${script_dir}/gen.sh"
 
     echo "Running ${script_dir}/tile.sh"
     time "${script_dir}/tile.sh"

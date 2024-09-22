@@ -16,6 +16,20 @@ Use __cattracks-explorer__ to visualize the generated data.
 - http://localhost:8080/public/?vector=http://localhost:3001/services/rye/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf
 
 
+20240920
+
+I ran the pipeline on master.
+
+The script halted after `ia`, probably due to some error along the way (probably buried in logs).
+The results look quite good.
+A few things to improve:
+- a big long straight "walking" line connect Spokane with Williamsburg. Long straight lines are impossible.
+- "Stationary" laps exist (eg RAGBRAI 2023)
+- homes are still spike balls, but not terrrible. This might be unavoidable to some extent, since I do wander around homebases randomly.
+- some bike laps are broken into too many segments (see twin lakes ride from the River)
+- where is my train ride Brussels-Paris (and back)? spotty sections.
+- where are the flights? are these points getting filtered for accuracy/speed? in the prelim cleanup stage?
+- 
 
 ### RKalman bug
 There was a bug where the regnull/Kalman filter would panic
