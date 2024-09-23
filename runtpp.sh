@@ -40,6 +40,7 @@ tippeargs=(
     --include MotionStateReason
 
     --single-precision
+    --generate-ids
 
     --read-parallel
     -l ${LAYER_NAME}
