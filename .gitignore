@@ -1,5 +1,6 @@
 
 testdata/*.json
+testdata/*.ndjson
 testdata/*.json.gz
 *.out
 build/bin/
