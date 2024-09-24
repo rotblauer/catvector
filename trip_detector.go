@@ -207,7 +207,7 @@ idRS: %v, idA: %v`,
 	weight += idO
 	weight += idA
 
-	// TODO: tinker
+	// TODO: tinker?
 	if weight < detectedStop {
 		d.Tripping = false
 		return nil
