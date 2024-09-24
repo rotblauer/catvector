@@ -41,7 +41,7 @@ func TestSegmentsIntersect(t *testing.T) {
 		//if isIntersection != tc.intersect {
 		//	t.Errorf("Test case %d failed: expected %v, got %v", i, tc.intersect, isIntersection)
 		//}
-		isIntersection := segmentsIntersect(tc.segment1, tc.segment2)
+		isIntersection, _, _ := segmentsIntersect(tc.segment1, tc.segment2)
 		if isIntersection != tc.intersect {
 			t.Errorf("Test case %d failed: expected %v, got %v", i, tc.intersect, isIntersection)
 		}

@@ -208,3 +208,26 @@ func TestReadStreamToLineString(t *testing.T) {
 	}
 
 }
+
+func TestToFixed(t *testing.T) {
+	type testT struct {
+		initial   float64
+		precision int
+		want      float64
+	}
+	for _, test := range []testT{
+		{0.123456789, 0, 0},
+		{123456789, 0, 123456789},
+		{0.123456789, 2, 0.12},
+		{0.123456789, 4, 0.1235},
+		{0.123456789, 6, 0.123457},
+		{0.123456789, 8, 0.12345679},
+		{200.123456789, 2, 200.12},
+		{20000.123456789, 4, 20000.1235},
+	} {
+		got := toFixed(test.initial, test.precision)
+		if got != test.want {
+			t.Errorf("got: %v, want: %v", got, test.want)
+		}
+	}
+}
