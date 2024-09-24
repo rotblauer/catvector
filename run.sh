@@ -65,7 +65,7 @@ main() {
     # This chunk copies <edge.json.gz>.
     # It
     # --------------------------------------------------
-    export OUTPUT_ROOT="$HOME/tdata/local/catvector/devop"
+    export OUTPUT_ROOT="$HOME/tdata/local/catvector/direct-master"
     # OUTPUT_REFERENCE is a copy of the source data for some run.
     # For data integrity and reproducibility.
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
@@ -74,7 +74,7 @@ main() {
     mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
 
     # Hardcode copy the original source data into our run's version of it.
-    cp "${HOME}/tdata/devop.json.gz" "${OUTPUT_REFERENCE}"
+    cp "${HOME}/tdata/direct-master.json.gz" "${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
 
 
