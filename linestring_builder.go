@@ -182,6 +182,9 @@ func (t *LineStringBuilder) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 	// Send the last linestring to the channel.
 	if t.LineStringFeature != nil && len(t.LineStringFeature.Geometry.(orb.LineString)) > 1 {
 		t.linestringsCh <- t.LineStringFeature
+	} else {
+		// Otherwise the target linestring will be overwritten with the new feature
+		// without sending the last feature.
 	}
 
 	t.LineStringFeatures = []*geojson.Feature{f}
@@ -201,25 +204,26 @@ var flagLinestringDisconinuityActivities = flag.Bool("linestring-discontinuity-a
 // According to some paper I found somewhere onetime, it's generally better
 // to break more than less. Trips/lines can then be synthesized later.
 func (t *LineStringBuilder) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous bool) {
+	// A failsafe in case something goes wrong.
+	// We assume that t.LastFeature() returns a non-nil value.
 	if len(t.lastNFeatures) == 0 {
 		return true
 	}
-
-	currentTime := mustGetTime(f, "Time")
-	lastTime := mustGetTime(t.LastFeature(), "Time")
-	if currentTime.Before(lastTime) {
-		// Reset
-		log.Println("WARN: feature not chronological, resetting tracker", currentTime, lastTime, currentTime.Sub(lastTime).Round(time.Second))
-		t.ResetState()
+	if f == nil {
 		return true
 	}
 
-	if len(t.lastNFeatures) == 1 {
-		return false
+	// Split any tracks separated by the DWELL INTERVAL in time,
+	// or any non-chronological points.
+	span := timespan(t.LastFeature(), f)
+	if span < 0 {
+		log.Println("WARN: linestring feature not chronological",
+			mustGetTime(t.LastFeature(), "Time"),
+			mustGetTime(f, "Time"),
+			span.Round(time.Second))
+		return true
 	}
-
-	// Split any tracks separated by the INTERVAL in time.
-	if span := timespan(t.LastFeature(), f); span > *flagDwellInterval || span < 0 {
+	if span > *flagDwellInterval {
 		return true
 	}
 
@@ -236,14 +240,20 @@ func (t *LineStringBuilder) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous
 }
 
 func (t *LineStringBuilder) AddPointFeature(f *geojson.Feature) {
-	if t.IsDiscontinuous(f) {
+	defer t.AddFeatureToState(f)
+
+	// This will be ONLY the first point the builder sees
+	// since the deferred AddFeatureToState will get called for all points.
+	if len(t.lastNFeatures) == 0 {
 		t.AddPointFeatureToNewLinestring(f)
-	} else {
-		t.AddPointFeatureToLastLinestring(f)
+		return
 	}
-	// When this function is called
-	// the feature is added to the LineStringBuilder's
-	// RAM, including the slice of features within configured
-	// (time) window and (length restricted) collection.
-	t.AddFeatureToState(f)
+
+	if t.IsDiscontinuous(f) {
+		t.ResetState()
+		t.AddPointFeatureToNewLinestring(f)
+		return
+	}
+
+	t.AddPointFeatureToLastLinestring(f)
 }
