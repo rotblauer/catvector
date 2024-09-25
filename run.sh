@@ -32,7 +32,7 @@ main() {
   #     Shoulda also nota the batch size.
   local batch_id="batch-044"
   local kitty
-  for kitty in ia rye; do
+  for kitty in rye ia; do
     export CAT_ONE="${kitty}"
 
     # FORK ALERT: Below are two forking chunks of code.
@@ -41,10 +41,9 @@ main() {
     # derived, I assume, from master.json.gz. IIRC it evolved to look
     # at subsets defined in batches from a pre-processed batching run
     # on master.json.gz.
-    # The way I handle idempotency is sporadic and undocumented
-    # but surely seemed convenient and probably necessary at the time.
 
-    # This chunk concatenates the batch files into a single reference file.
+    # --------------------------------------------------
+    # FORK 1/2: This chunk concatenates the batch files into a single reference file.
     # --------------------------------------------------
 #    export OUTPUT_ROOT="$HOME/tdata/local/catvector/${batch_id}x"
 #    export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
@@ -62,21 +61,27 @@ main() {
 #    done
 #    { set +x; } 2>/dev/null
 
-    # This chunk copies <edge.json.gz>.
-    # It
     # --------------------------------------------------
+    # FORK 2/2: This chunk copies <edge.json.gz> as the simple original track data source.
+    # --------------------------------------------------
+    # OUTPUT_ROOT is the root directory for the data output of this run.
+    # Change this to match the source data for this run.
+    # export OUTPUT_ROOT="$HOME/tdata/local/catvector/edge"
     export OUTPUT_ROOT="$HOME/tdata/local/catvector/direct-master"
     # OUTPUT_REFERENCE is a copy of the source data for some run.
-    # For data integrity and reproducibility.
+    # Probably don't change this.
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
+    # TRACKS_SOURCE_GZ is the "original source" for the tracks pipeline; it will be a COPY of the source data defined above.
+    # Probably don't change this.
     export TRACKS_SOURCE_GZ="${OUTPUT_REFERENCE}"
-    set -x
-    mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
 
     # Hardcode copy the original source data into our run's version of it.
+    # MODIFY THIS TO CHANGE THE SOURCE DATA FOR THIS RUN.
+    set -x
+    mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
+    # cp "${HOME}/tdata/edge.json.gz" "${OUTPUT_REFERENCE}"
     cp "${HOME}/tdata/direct-master.json.gz" "${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
-
 
     ## Run the scripts.
     local script_dir
