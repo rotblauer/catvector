@@ -149,7 +149,7 @@ func segmentsIntersect(segA, segB orb.LineString) (intersect bool, x, y *float64
 		i_x := p0_x + (t * s1_x)
 		i_y := p0_y + (t * s1_y)
 		i := orb.Point{i_x, i_y}
-		// IsDetectStopIntersection is considered exclusive to the endpoints of a (either) segment.
+		// DetectStopIntersection is considered exclusive to the endpoints of a (either) segment.
 		// My use case is primarily contiguous segments.
 		if !segA.Bound().Min.Equal(i) && !segA.Bound().Max.Equal(i) {
 			return true, &i_x, &i_y
@@ -188,12 +188,12 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 	}
 
 	weight := detectedNeutral
-	idPC := d.IsDetectStopPointClustering(f)
-	idPCC := d.IsDetectStopPointClusteringCentroid(f)
-	idX := d.IsDetectStopIntersection(f)
-	idRS := d.IsDetectStopReportedSpeeds(f)
-	idO := d.IsDetectStopOverlaps(f)
-	idA := d.IsDetectStopReportedActivities(f)
+	idPC := d.DetectStopPointClustering(f)
+	idPCC := d.DetectStopPointClusteringCentroid(f)
+	idX := d.DetectStopIntersection(f)
+	idRS := d.DetectStopReportedSpeeds(f)
+	idO := d.DetectStopOverlaps(f)
+	idA := d.DetectStopReportedActivities(f)
 
 	d.MotionStateReason = fmt.Sprintf(`idPC: %v, idPCC: %v,
 idX: %v, idO: %v, 
@@ -272,7 +272,8 @@ func (d *TripDetector) IsDetectSignalLoss(f *geojson.Feature) (signalLossDetecte
 	return false
 }
 
-// IsDetectStopPointClustering is a method that identifies trip ends during normal GPS recording.
+//
+//DetectStopPointClustering is a method that identifies trip ends during normal GPS recording.
 /*
 	Identifying trip ends during normal GPS recording...
 
@@ -305,7 +306,7 @@ func (d *TripDetector) IsDetectSignalLoss(f *geojson.Feature) (signalLossDetecte
 	clustering exceeds 120 s; otherwise, it is treated as the
 	pseudo one and will be removed.
 */
-func (d *TripDetector) IsDetectStopPointClustering(f *geojson.Feature) (result DetectedT) {
+func (d *TripDetector) DetectStopPointClustering(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	currentTime := t.MustGetTime()
@@ -337,7 +338,7 @@ outer:
 	return detectedTrip
 }
 
-func (d *TripDetector) IsDetectStopPointClusteringCentroid(f *geojson.Feature) (result DetectedT) {
+func (d *TripDetector) DetectStopPointClusteringCentroid(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	dwellExceeded := false
@@ -364,12 +365,12 @@ func (d *TripDetector) IsDetectStopPointClusteringCentroid(f *geojson.Feature) (
 	return detectedNeutral
 }
 
-// IsDetectStopIntersection is a method that identifies trip ends with track point segment intersections.
+// DetectStopIntersection is a method that identifies trip ends with track point segment intersections.
 /*
 	Experimental: identifying trip ends with track point segment intersections.
 	When knots are introduced to our lines, interpret this as a trip end.
 */
-func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result DetectedT) {
+func (d *TripDetector) DetectStopIntersection(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	// Experimental: identifying trip ends with track point segment intersections.
@@ -401,7 +402,7 @@ func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result Dete
 	return DetectedT(d.segmentIntersectionGauge * float64(detectedStop))
 }
 
-// IsDetectStopOverlaps is a method that identifies trip ends with track point segment overlaps.
+// DetectStopOverlaps is a method that identifies trip ends with track point segment overlaps.
 /*
 	In addition, some short trip ends may take less than
 	2 min such as ‘‘picking up or dropping off somebody.’’
@@ -417,7 +418,7 @@ func (d *TripDetector) IsDetectStopIntersection(f *geojson.Feature) (result Dete
 	50 m (considering the physical size of intersections in
 	Shanghai), a trip end is flagged.
 */
-func (d *TripDetector) IsDetectStopOverlaps(f *geojson.Feature) (result DetectedT) {
+func (d *TripDetector) DetectStopOverlaps(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	// Experimental: identifying trip ends with track point segment intersections.
@@ -468,7 +469,7 @@ func (d *TripDetector) IsDetectStopOverlaps(f *geojson.Feature) (result Detected
 	return detectedNeutral
 }
 
-func (d *TripDetector) IsDetectStopReportedSpeeds(f *geojson.Feature) (result DetectedT) {
+func (d *TripDetector) DetectStopReportedSpeeds(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
 	referenceSpeeds := d.intervalPoints.ReportedSpeeds(t.MustGetTime().Add(-d.TripStartTime))
@@ -488,7 +489,7 @@ func (d *TripDetector) IsDetectStopReportedSpeeds(f *geojson.Feature) (result De
 	return detectedNeutral
 }
 
-func (d *TripDetector) IsDetectStopReportedActivities(f *geojson.Feature) (result DetectedT) {
+func (d *TripDetector) DetectStopReportedActivities(f *geojson.Feature) (result DetectedT) {
 	activity, ok := f.Properties["Activity"]
 	if !ok {
 		return detectedNeutral
