@@ -3,6 +3,7 @@ Turns cat tracks into cat vectors -- geojson linestrings.
 This project is primarily intended to develop a trip detection pipeline.
 Trips are represented as linestrings, and non-trips (stops/visits/naps/pauses)
 can be represented as points.
+
 `cmdTripDetector` is the initial and, at the time of writing, the current state of the art.
 It was derived largely from some whitepapers I found on trip detection algorithms, and
 uses dwell time, dwell distance, and time between track points.
@@ -14,6 +15,45 @@ time might be suggestive of "stops."
 Use [cattracks-explorer](https://github.com/rotblauer/cattracks-explorer) to visualize the generated data.
 - http://localhost:8080/public/?vector=http://localhost:3001/services/ia/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf
 - http://localhost:8080/public/?vector=http://localhost:3001/services/rye/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf
+
+
+20241004
+
+```sh
+  echo >&2 "Processing category: ${CAT_ONE}, batch: ${batch_id}"
+  ${BUILD_TARGET} validate \
+    | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
+    | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"')' \
+    | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
+    | ${BUILD_TARGET} --urban-canyon-distance=200 preprocess \
+    | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=15 --trip-start-interval=30s --speed-threshold=0.5 trip-detector \
+    | tee >( \
+      gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
+        | ${BUILD_TARGET} --dwell-interval=120s points-to-linestrings \
+        | ${BUILD_TARGET} --threshold=0.00008 douglas-peucker \
+        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
+    ) \
+    | tee >( \
+      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false),#(properties.MotionStateReason!="reset")' \
+        | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=100 consolidate-stops \
+        | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
+    )
+```
+
+Above is a copy of the logical heart of the `gen.sh` pipeline.
+
+- Contiguous naps and laps?
+I am realizing now that a limitation of structurally forking laps and naps logic and data
+is that NAPS and LAPS are not respective of each other. Intuitively some cat's lap must begin from exactly where it finished napping, and must end where it starts its next nap; laps and naps should be contiguous. Currently, naps are "floating" points usually _near_ to starts and stops of lap starts/stops, but not contiguous with them. This will also mean difficulty or impossible temporal indexing of laps and naps relative to each other. "Tell me about the naps before and after some lap" may be a hard question. Can I MERGE the two data sets? It might be nice to be able to tell the "story" in a timeline-style way; nap, lap, another nap... etc. On the other hand, we can expect the timestamps of both naps and laps to be consistent with and respective of each other; so a front-end `sort` on `Time` should be able to merge the resources. 
+
+Another feature: indexing naps (and laps?). To be able to say: this cat has napped here 22 times; here are those naps.
+Laps, too; like Strava segments -- these will be harder. But it would be awesome to be able to look at Rye's
+morning runs as laps of a common track.   
+
+...
+
+What if NAPS were consolidated as areas (ie S2 cells) of X size.
+
 
 20240920
 
