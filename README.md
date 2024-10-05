@@ -16,6 +16,21 @@ Use [cattracks-explorer](https://github.com/rotblauer/cattracks-explorer) to vis
 - http://localhost:8080/public/?vector=http://localhost:3001/services/ia/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf
 - http://localhost:8080/public/?vector=http://localhost:3001/services/rye/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf
 
+---
+
+20241005
+
+Real cats will push 100 points at a time every ~2minutes.
+Is the trip detector ready for an intermittent stream of tracks?
+Should the TD use a persistent state to track cats?
+Or should it get fed redundant batches, reprocessing them, and using
+an edge/devop/master pattern? 
+
+The Trip Detector and Stop Consolidator both accept streams of points read over stdin,
+and both output streams of (Geo)JSON to stdout. The output stream can be gzip-appended
+to any existing compressed gzip file (probably containing a list of GeoJSON features).
+
+
 
 20241004
 
@@ -53,6 +68,9 @@ morning runs as laps of a common track.
 ...
 
 What if NAPS were consolidated as areas (ie S2 cells) of X size.
+How would each naps get aggregated to the larger napping place?
+- total nap time spent there
+- latest nap time, first nap time
 
 
 20240920

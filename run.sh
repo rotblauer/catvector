@@ -32,7 +32,7 @@ main() {
   #     Shoulda also nota the batch size.
   local batch_id="batch-044"
   local kitty
-  for kitty in rye; do
+  for kitty in rye ia; do
     export CAT_ONE="${kitty}"
 
     # FORK ALERT: Below are two forking chunks of code.
