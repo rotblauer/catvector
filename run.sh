@@ -66,8 +66,8 @@ main() {
     # --------------------------------------------------
     # OUTPUT_ROOT is the root directory for the data output of this run.
     # Change this to match the source data for this run.
-    # export OUTPUT_ROOT="$HOME/tdata/local/catvector/edge"
-    export OUTPUT_ROOT="$HOME/tdata/local/catvector/direct-master"
+     export OUTPUT_ROOT="$HOME/tdata/local/catvector/edge"
+#    export OUTPUT_ROOT="$HOME/tdata/local/catvector/direct-master"
     # OUTPUT_REFERENCE is a copy of the source data for some run.
     # Probably don't change this.
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
@@ -79,8 +79,8 @@ main() {
     # MODIFY THIS TO CHANGE THE SOURCE DATA FOR THIS RUN.
     set -x
     mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
-    # cp "${HOME}/tdata/edge.json.gz" "${OUTPUT_REFERENCE}"
-    cp "${HOME}/tdata/direct-master.json.gz" "${OUTPUT_REFERENCE}"
+     cp "${HOME}/tdata/edge.json.gz" "${OUTPUT_REFERENCE}"
+#    cp "${HOME}/tdata/direct-master.json.gz" "${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
 
     ## Run the scripts.
@@ -88,8 +88,8 @@ main() {
     script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
     set -x
-#    echo "Running ${script_dir}/gen.sh"
-#    time "${script_dir}/gen.sh"
+    echo "Running ${script_dir}/gen.sh"
+    time "${script_dir}/gen.sh"
 
     echo "Running ${script_dir}/tile.sh"
     time "${script_dir}/tile.sh"

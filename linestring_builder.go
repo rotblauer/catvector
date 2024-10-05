@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"math"
 	"time"
 
 	"github.com/paulmach/orb"
@@ -70,19 +71,19 @@ func calculatedAverageSpeedAbsolute(pointFeatures []*geojson.Feature) float64 {
 	}
 	firstTime := mustGetTime(pointFeatures[0], "Time")
 	lastTime := mustGetTime(pointFeatures[len(pointFeatures)-1], "Time")
-	timeDelta := lastTime.Sub(firstTime).Seconds()
+	timeDelta := math.Abs(lastTime.Sub(firstTime).Seconds())
 	distance := geo.Distance(pointFeatures[0].Point(), pointFeatures[len(pointFeatures)-1].Point())
 
 	return distance / timeDelta
 }
 
-func calculatedAverageSpeedTraversed(pointFeatures []*geojson.Feature) float64 {
+func averageSpeedTraversed(pointFeatures []*geojson.Feature) float64 {
 	if len(pointFeatures) < 2 {
 		return 0
 	}
 	sum := 0.0
 	for i := 1; i <= len(pointFeatures)-1; i++ {
-		sum += calculatedAverageSpeedAbsolute(pointFeatures[i-1 : i])
+		sum += calculatedAverageSpeedAbsolute([]*geojson.Feature{pointFeatures[i], pointFeatures[i-1]})
 	}
 	return sum / float64(len(pointFeatures))
 }
@@ -98,7 +99,7 @@ func calculatedAverageSpeedTraversedLinestring(lineString *geojson.Feature) floa
 	return distance / lineString.Properties["Duration"].(float64)
 }
 
-func averageReportedSpeed(pointFeatures []*geojson.Feature) float64 {
+func averageSpeedReported(pointFeatures []*geojson.Feature) float64 {
 	if len(pointFeatures) < 2 {
 		return pointFeatures[0].Properties["Speed"].(float64)
 	}
@@ -174,8 +175,8 @@ func (t *LineStringBuilder) AddPointFeatureToLastLinestring(f *geojson.Feature) 
 	t.LineStringFeature.Properties["Duration"] = timespan(t.LineStringFeatures[0], f).Round(time.Second).Seconds()
 	t.LineStringFeature.Properties["DistanceTraversed"] = toFixed(getTraversedDistance(t.LineStringFeatures), 2)
 	t.LineStringFeature.Properties["DistanceAbsolute"] = toFixed(getAbsoluteDistance(t.LineStringFeatures), 2)
-	t.LineStringFeature.Properties["AverageReportedSpeed"] = toFixed(averageReportedSpeed(t.LineStringFeatures), 2)
-	t.LineStringFeature.Properties["AverageCalculatedSpeed"] = toFixed(calculatedAverageSpeedTraversed(t.LineStringFeatures), 2)
+	t.LineStringFeature.Properties["AverageReportedSpeed"] = toFixed(averageSpeedReported(t.LineStringFeatures), 2)
+	t.LineStringFeature.Properties["AverageCalculatedSpeed"] = toFixed(averageSpeedTraversed(t.LineStringFeatures), 2)
 }
 
 func (t *LineStringBuilder) AddPointFeatureToNewLinestring(f *geojson.Feature) {
