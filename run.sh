@@ -32,7 +32,7 @@ main() {
   #     Shoulda also nota the batch size.
   local batch_id="batch-044"
   local kitty
-  for kitty in rye ia; do
+  for kitty in rye; do
     export CAT_ONE="${kitty}"
 
     # FORK ALERT: Below are two forking chunks of code.
@@ -88,8 +88,8 @@ main() {
     script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
     set -x
-    echo "Running ${script_dir}/gen.sh"
-    time "${script_dir}/gen.sh"
+#    echo "Running ${script_dir}/gen.sh"
+#    time "${script_dir}/gen.sh"
 
     echo "Running ${script_dir}/tile.sh"
     time "${script_dir}/tile.sh"

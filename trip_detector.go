@@ -344,6 +344,8 @@ func (d *TripDetector) DetectStopPointClusteringCentroid(f *geojson.Feature) (re
 	dwellExceeded := false
 
 	// Update the d.intervalPtsCentroid value to reflect the centroid of d.intervalPoints.
+	// NOTE We INCLUDE the cursor point in the centroid calculation.
+	//
 	pts := []orb.Point{t.Point()}
 	// traverse intervalPoints backwards.
 	for i := len(d.intervalPoints) - 1; i >= 0; i-- {
@@ -366,6 +368,8 @@ func (d *TripDetector) DetectStopPointClusteringCentroid(f *geojson.Feature) (re
 }
 
 // DetectStopIntersection is a method that identifies trip ends with track point segment intersections.
+// This function returns RESULT values that are usually LESS THAN 1 (or the STANDARD unit).
+// This will mean that this function will usually be a "tie-breaker," but
 /*
 	Experimental: identifying trip ends with track point segment intersections.
 	When knots are introduced to our lines, interpret this as a trip end.
@@ -385,14 +389,21 @@ func (d *TripDetector) DetectStopIntersection(f *geojson.Feature) (result Detect
 			t.Point(),
 		}
 
+		// Each of the segments iterated in the dwell interval list will be compared
+		// with the "current" segment, which is composed by the two latest points.
+		// A linestring with 100 coordinates will have 99 segments that get iterated.
 		for i := len(dwellIntervalPts) - 1; i > 0; i-- {
 			segment := orb.LineString{dwellIntervalPts[i-1].Point(), dwellIntervalPts[i].Point()}
-			if x, _, _ := segmentsIntersect(segment, currentSegment); x {
+			if isIntersection, _, _ := segmentsIntersect(segment, currentSegment); isIntersection {
 				// A hard delta value of 0.025 seemed to work decently.
-				// Experimenting with an estimated normal 100-120 points in the dwellInterval
+				// Experimenting with an estimated normal 100-120 points in the ~2minute dwellInterval
 				// to approximate this, we can estimate the delta as 1/100 = 0.01.
 				delta := 1.0 / float64(len(dwellIntervalPts))
+
+				// Take the min of the proportional value and 0.025
+				// to prevent short intervals from being strongly opinionated.
 				delta = math.Min(delta, 0.025)
+
 				d.segmentIntersectionGauge += delta
 				//break
 			}
@@ -439,7 +450,7 @@ func (d *TripDetector) DetectStopOverlaps(f *geojson.Feature) (result DetectedT)
 			// I want the length of the segment on the linestring between the intersection.
 			// It's a ring.
 			ringLen := 0.0
-			if x, _, _ := segmentsIntersect(segment, currentSegment); x {
+			if isIntersection, _, _ := segmentsIntersect(segment, currentSegment); isIntersection {
 
 				// We were stepping backwards through the dwell-interval points.
 				// Now we're going to walk foraward through it, since we know
