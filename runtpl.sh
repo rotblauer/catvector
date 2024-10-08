@@ -30,7 +30,9 @@ tippeargs=(
     --include DistanceAbsolute
     --include AverageReportedSpeed
     --include AverageCalculatedSpeed
-    --include MotionStateReason
+    --include ElevationGain
+    --include ElevationLoss
+#    --include MotionStateReason
 
     --single-precision
     --generate-ids

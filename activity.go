@@ -99,10 +99,12 @@ func activityMode(list []*geojson.Feature) Activity {
 }
 
 func activityModeNotUnknown(list []*geojson.Feature) Activity {
-	activities := make([]float64, len(list))
-	for i, f := range list {
+	activities := []float64{}
+	for _, f := range list {
 		act := ActivityFromReport(f.Properties["Activity"])
-		activities[i] = float64(act)
+		if act > TrackerStateUnknown {
+			activities = append(activities, float64(act))
+		}
 	}
 	activitiesStats := stats.Float64Data(activities)
 	mode, _ := activitiesStats.Mode()

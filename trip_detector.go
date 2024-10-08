@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/montanaflynn/stats"
 	"github.com/paulmach/orb/planar"
@@ -195,12 +196,13 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 	idO := d.DetectStopOverlaps(f)
 	idA := d.DetectStopReportedActivities(f)
 	idG := d.DetectStopGyroscope(f)
+	idNI := d.DetectStopNetworkInfo(f)
 
 	d.MotionStateReason = fmt.Sprintf(`idPC: %v, idPCC: %v,
 idX: %v, idO: %v, 
 idRS: %v, idA: %v,
-idG: %v`,
-		idPC, idPCC, idX, idO, idRS, idA, idG)
+idG: %v, idNI: %v`,
+		idPC, idPCC, idX, idO, idRS, idA, idG, idNI)
 
 	weight += idPC
 	weight += idPCC
@@ -209,6 +211,7 @@ idG: %v`,
 	weight += idO
 	weight += idA
 	weight += idG
+	weight += idNI
 
 	// TODO: tinker?
 	if weight < detectedStop {
@@ -571,6 +574,22 @@ func (d *TripDetector) DetectStopGyroscope(f *geojson.Feature) (result DetectedT
 	}
 	if metTimeThreshold {
 		return detectedStop
+	}
+	return detectedNeutral
+}
+
+type NetworkInfo struct {
+	SSID string `json:"ssid"`
+}
+
+func (d *TripDetector) DetectStopNetworkInfo(f *geojson.Feature) (result DetectedT) {
+	if v, ok := f.Properties["NetworkInfo"]; ok {
+		if s, ok := v.(string); ok {
+			netInfo := NetworkInfo{}
+			if err := json.Unmarshal([]byte(s), &netInfo); err == nil && netInfo.SSID != "" {
+				return detectedStop
+			}
+		}
 	}
 	return detectedNeutral
 }

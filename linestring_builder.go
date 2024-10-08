@@ -144,7 +144,10 @@ func getTraversedDistance(pointFeatures []*geojson.Feature) float64 {
 	}
 	sum := 0.0
 	for i := 1; i < len(pointFeatures); i++ {
-		sum += getAbsoluteDistance(pointFeatures[i-1 : i+1])
+		sum += getAbsoluteDistance(
+			[]*geojson.Feature{
+				pointFeatures[i-1], pointFeatures[i],
+			})
 	}
 	return sum
 }
@@ -160,6 +163,22 @@ func calculatedAverageAccuracy(pointFeatures []*geojson.Feature) float64 {
 	return sum / float64(len(pointFeatures))
 }
 
+func getTraversedElevations(pointFeatures []*geojson.Feature) (up, dn float64) {
+	if len(pointFeatures) < 2 {
+		return 0, 0
+	}
+	for i := 1; i < len(pointFeatures); i++ {
+		delta := pointFeatures[i].Properties["Elevation"].(float64) - pointFeatures[i-1].Properties["Elevation"].(float64)
+		if delta > 0 {
+			up += delta
+		} else {
+			dn += delta
+		}
+	}
+	return up, dn
+
+}
+
 func (t *LineStringBuilder) AddPointFeatureToLastLinestring(f *geojson.Feature) {
 	t.LineStringFeature.Geometry = append(t.LineStringFeature.Geometry.(orb.LineString), f.Point())
 	t.LineStringFeatures = append(t.LineStringFeatures, f)
@@ -169,14 +188,22 @@ func (t *LineStringBuilder) AddPointFeatureToLastLinestring(f *geojson.Feature) 
 		t.LineStringFeature.Properties[k] = v
 	}
 
+	// Values which require the entire linestring to be calculated.
+	durationSeconds := timespan(t.LineStringFeatures[0], f).Round(time.Second).Seconds()
 	t.LineStringFeature.Properties["PointCount"] = len(t.LineStringFeatures)
 	t.LineStringFeature.Properties["Activity"] = activityModeNotUnknown(t.LineStringFeatures).String()
 	t.LineStringFeature.Properties["AverageAccuracy"] = toFixed(calculatedAverageAccuracy(t.LineStringFeatures), 0)
-	t.LineStringFeature.Properties["Duration"] = timespan(t.LineStringFeatures[0], f).Round(time.Second).Seconds()
-	t.LineStringFeature.Properties["DistanceTraversed"] = toFixed(getTraversedDistance(t.LineStringFeatures), 2)
+	t.LineStringFeature.Properties["Duration"] = durationSeconds
 	t.LineStringFeature.Properties["DistanceAbsolute"] = toFixed(getAbsoluteDistance(t.LineStringFeatures), 2)
 	t.LineStringFeature.Properties["AverageReportedSpeed"] = toFixed(averageSpeedReported(t.LineStringFeatures), 2)
-	t.LineStringFeature.Properties["AverageCalculatedSpeed"] = toFixed(averageSpeedTraversed(t.LineStringFeatures), 2)
+
+	// Incrementally accrued values.
+	t.LineStringFeature.Properties["DistanceTraversed"] = toFixed(t.LineStringFeature.Properties["DistanceTraversed"].(float64)+getTraversedDistance(t.LineStringFeatures[len(t.LineStringFeatures)-2:]), 2)
+	t.LineStringFeature.Properties["AverageCalculatedSpeed"] = toFixed(t.LineStringFeature.Properties["DistanceTraversed"].(float64)/durationSeconds, 2)
+
+	up, dn := getTraversedElevations(t.LineStringFeatures[len(t.LineStringFeatures)-2:])
+	t.LineStringFeature.Properties["ElevationGain"] = toFixed(t.LineStringFeature.Properties["ElevationGain"].(float64)+up, 2)
+	t.LineStringFeature.Properties["ElevationLoss"] = toFixed(t.LineStringFeature.Properties["ElevationLoss"].(float64)+dn, 2)
 }
 
 func (t *LineStringBuilder) AddPointFeatureToNewLinestring(f *geojson.Feature) {
@@ -197,6 +224,9 @@ func (t *LineStringBuilder) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 	t.LineStringFeature.Properties["StartTime"] = f.Properties["Time"]
 	t.LineStringFeature.Properties["Duration"] = 0.0
 	t.LineStringFeature.Properties["MotionStateReason"] = f.Properties["MotionStateReason"]
+	t.LineStringFeature.Properties["DistanceTraversed"] = 0.0
+	t.LineStringFeature.Properties["ElevationGain"] = 0.0
+	t.LineStringFeature.Properties["ElevationLoss"] = 0.0
 }
 
 var flagLinestringDisconinuityActivities = flag.Bool("linestring-discontinuity-activities", false, "If true, linestrings will be split on activity changes.")

@@ -37,7 +37,7 @@ tippeargs=(
     --include P99Dist
     --include Area
 
-    --include MotionStateReason
+#    --include MotionStateReason
 
     --single-precision
     --generate-ids
