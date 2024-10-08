@@ -194,11 +194,13 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 	idRS := d.DetectStopReportedSpeeds(f)
 	idO := d.DetectStopOverlaps(f)
 	idA := d.DetectStopReportedActivities(f)
+	idG := d.DetectStopGyroscope(f)
 
 	d.MotionStateReason = fmt.Sprintf(`idPC: %v, idPCC: %v,
 idX: %v, idO: %v, 
-idRS: %v, idA: %v`,
-		idPC, idPCC, idX, idO, idRS, idA)
+idRS: %v, idA: %v,
+idG: %v`,
+		idPC, idPCC, idX, idO, idRS, idA, idG)
 
 	weight += idPC
 	weight += idPCC
@@ -206,6 +208,7 @@ idRS: %v, idA: %v`,
 	weight += idRS
 	weight += idO
 	weight += idA
+	weight += idG
 
 	// TODO: tinker?
 	if weight < detectedStop {
@@ -518,6 +521,56 @@ func (d *TripDetector) DetectStopReportedActivities(f *geojson.Feature) (result 
 		return detectedNeutral
 	default:
 		panic("unhandled default case")
+	}
+	return detectedNeutral
+}
+
+var gyroscopeProps = []string{"GyroscopeX", "GyroscopeY", "GyroscopeZ"}
+var GyroscopeStableThresholdReading = 0.01
+var GyroscopeStableThresholdTime = 30 * time.Second
+
+// isGyroscopicallyStable returns true if the feature is considered stable by the gyroscope.
+// Valid is returned true only if all gyroscope attributes exist on the feature.
+func isGyroscopicallyStable(f *geojson.Feature) (stable, valid bool) {
+	sum := 0.0
+	for _, prop := range gyroscopeProps {
+		v, ok := f.Properties[prop]
+		if !ok {
+			return false, false
+		}
+		fl, ok := v.(float64)
+		if !ok {
+			return false, false
+		}
+		sum += fl
+	}
+	return sum < GyroscopeStableThresholdReading, true
+}
+
+func (d *TripDetector) DetectStopGyroscope(f *geojson.Feature) (result DetectedT) {
+	// Iterate all dwell interval points backwards.
+	// If the point has gyroscopic data, we will use it to determine if the trip has stopped.
+	// If gyroscopically stable points are detected and span 30s continuously,
+	// we consider the trip certainly stopped.
+	t := &TrackGeoJSON{f}
+
+	if stable, valid := isGyroscopicallyStable(f); !valid || !stable {
+		return detectedNeutral
+	}
+
+	metTimeThreshold := false
+	for i := len(d.intervalPoints) - 1; i >= 0; i-- {
+		p := d.intervalPoints[i]
+		if p.MustGetTime().Before(t.MustGetTime().Add(-GyroscopeStableThresholdTime)) {
+			metTimeThreshold = true
+			break
+		}
+		if stable, valid := isGyroscopicallyStable(p.Feature); !valid || !stable {
+			return detectedNeutral
+		}
+	}
+	if metTimeThreshold {
+		return detectedStop
 	}
 	return detectedNeutral
 }
