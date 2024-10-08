@@ -20,13 +20,15 @@ const segmentBoundEpsilon = 1e-5
 // Trips are defined as a series of points that are moving, structured as LineStrings.
 // Stops are defined as a series of points that are stationary, structured as Points.
 type TripDetector struct {
-	DwellTime      time.Duration
-	TripStartTime  time.Duration
-	SpeedThreshold float64
-	DwellDistance  float64
-	lastNPoints    TracksGeoJSON
-	intervalPoints TracksGeoJSON
-	Tripping       bool
+	DwellTime                                time.Duration
+	TripStartTime                            time.Duration
+	SpeedThreshold                           float64
+	DwellDistance                            float64
+	lastNPoints                              TracksGeoJSON
+	intervalPoints                           TracksGeoJSON
+	Tripping                                 bool
+	continuousGyroscopicStabilityGaugeCursor time.Time
+	continuousGyroscopicStabilityGauge       float64
 
 	// MotionStateReason is a string that describes the reason for the current state of the TripDetector.
 	MotionStateReason string
@@ -101,6 +103,7 @@ func (d *TripDetector) ResetState() {
 	d.lastNPoints = TracksGeoJSON{}
 	d.intervalPoints = TracksGeoJSON{}
 	d.segmentIntersectionGauge = 0
+	d.continuousGyroscopicStabilityGauge = 0
 }
 
 // segmentsIntersect returns true if the two line segments intersect.
@@ -545,7 +548,7 @@ func isGyroscopicallyStable(f *geojson.Feature) (stable, valid bool) {
 		if !ok {
 			return false, false
 		}
-		sum += fl
+		sum += math.Abs(fl)
 	}
 	return sum < GyroscopeStableThresholdReading, true
 }
@@ -556,23 +559,18 @@ func (d *TripDetector) DetectStopGyroscope(f *geojson.Feature) (result DetectedT
 	// If gyroscopically stable points are detected and span 30s continuously,
 	// we consider the trip certainly stopped.
 	t := &TrackGeoJSON{f}
+	tt := t.MustGetTime()
+	if delta := tt.Sub(d.continuousGyroscopicStabilityGaugeCursor).Seconds(); delta > 0 {
+		d.continuousGyroscopicStabilityGaugeCursor = tt
 
-	if stable, valid := isGyroscopicallyStable(f); !valid || !stable {
-		return detectedNeutral
-	}
-
-	metTimeThreshold := false
-	for i := len(d.intervalPoints) - 1; i >= 0; i-- {
-		p := d.intervalPoints[i]
-		if p.MustGetTime().Before(t.MustGetTime().Add(-GyroscopeStableThresholdTime)) {
-			metTimeThreshold = true
-			break
-		}
-		if stable, valid := isGyroscopicallyStable(p.Feature); !valid || !stable {
-			return detectedNeutral
+		stable, valid := isGyroscopicallyStable(f)
+		if stable && valid {
+			d.continuousGyroscopicStabilityGauge += delta
+		} else {
+			d.continuousGyroscopicStabilityGauge = 0
 		}
 	}
-	if metTimeThreshold {
+	if d.continuousGyroscopicStabilityGauge >= GyroscopeStableThresholdTime.Seconds() {
 		return detectedStop
 	}
 	return detectedNeutral

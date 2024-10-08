@@ -38,10 +38,10 @@ postprocess() {
 
   # Map the VALID points. These are all points.
   # They are useful for comparing the laps and naps against the "raw" data.
-  [[ -d "${OUTPUT_ROOT_CAT_ONE}"/valid ]] \
-  && cat "${OUTPUT_ROOT_CAT_ONE}"/valid/*.json.gz \
-    | tee -a "${OUTPUT_ROOT_CAT_ONE}/valid.json.gz" \
-    | zcat | ${script_dir}/runtpp.sh "${OUTPUT_ROOT_CAT_ONE}/valid.mbtiles"
+#  [[ -d "${OUTPUT_ROOT_CAT_ONE}"/valid ]] \
+#  && cat "${OUTPUT_ROOT_CAT_ONE}"/valid/*.json.gz \
+#    | tee -a "${OUTPUT_ROOT_CAT_ONE}/valid.json.gz" \
+#    | zcat | ${script_dir}/runtpp.sh "${OUTPUT_ROOT_CAT_ONE}/valid.mbtiles"
 
   # Remove the intermediate files.
   #     rm -rf "${OUTPUT_ROOT_CAT_ONE}"/linestrings
