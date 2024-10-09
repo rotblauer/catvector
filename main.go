@@ -361,6 +361,72 @@ func wangUrbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh cha
 						}
 					}
 				}
+				close(featureChan)
+				closeCh <- x
+				return
+			}
+		}
+	}()
+	return featureChan, errChan, closeCh
+}
+
+// Declare a teleportFactor float64 flag.
+var flagTeleportFactor = flag.Float64("teleport-factor", 10.0, "teleportation factor")
+var flagTeleportIntervalMax = flag.Duration("teleport-interval-max", 2*time.Minute, "teleportation interval max")
+
+func teleportationFilterStream(featuresCh chan *geojson.Feature, closingCh chan struct{}) (chan *geojson.Feature, chan error, chan struct{}) {
+	featureChan := make(chan *geojson.Feature)
+	errChan := make(chan error)
+	closeCh := make(chan struct{}, 1)
+
+	lastFeature := &geojson.Feature{Geometry: orb.Point{0, 0}}
+
+	handleFeature := func(f *geojson.Feature) {
+		if f == nil {
+			return
+		}
+		if lastFeature.Point().Lat() == 0 && lastFeature.Point().Lon() == 0 {
+			lastFeature = f
+			featureChan <- f
+			return
+		}
+		dist := geo.Distance(lastFeature.Point(), f.Point())
+		span := mustGetTime(f, "Time").Sub(mustGetTime(lastFeature, "Time"))
+
+		// If we exceed the teleportation interval max, it's a reset because the cat has now
+		// been wandering too long untracked.
+		if span > *flagTeleportIntervalMax {
+			lastFeature = f
+			featureChan <- f
+			return
+		}
+
+		// Compare the reported speed against the calculated speed.
+		// If the calculated speed exceeds the reported speed by X factor, it's a teleportation point.
+		calculatedSpeed := dist / span.Seconds()
+		reportedSpeed := f.Properties.MustFloat64("Speed")
+		if calculatedSpeed > reportedSpeed*(*flagTeleportFactor) {
+			j, _ := json.Marshal(f)
+			errChan <- fmt.Errorf("teleportation point: %s", string(j))
+			return
+		}
+		// Else the last and cursor points passed the teleportation challenge!
+		// They are near enough in time and space.
+		lastFeature = f
+		featureChan <- f
+	}
+
+	go func() {
+		for {
+			select {
+			case f := <-featuresCh:
+				handleFeature(f)
+			case x := <-closingCh:
+				// Drain the feature chan.
+				for f := range featuresCh {
+					handleFeature(f)
+				}
+				close(featureChan)
 				closeCh <- x
 				return
 			}
@@ -371,15 +437,29 @@ func wangUrbanCanyonFilterStream(featuresCh chan *geojson.Feature, closingCh cha
 
 func cmdPreprocess(i io.ReadCloser, o io.WriteCloser) {
 	featureCh, errCh, closeCh := readStreamWithFeatureCallback(i, preProcessFilters)
-	processedCh, procErrCh, doneCh := wangUrbanCanyonFilterStream(featureCh, closeCh)
+	wangProcessedCh, wangProcErrCh, wangDoneCh := wangUrbanCanyonFilterStream(featureCh, closeCh)
+	teleProcessedCh, teleProcErrCh, teleDoneCh := teleportationFilterStream(wangProcessedCh, wangDoneCh)
+
+	okFeatures := 0
+	wangUrbanCanyonHits, teleportationHits := 0, 0
+
+	defer func() {
+		// Log the ratios of wangUrbanCanyonHits and teleportationHits to okFeatures.
+		totalFeatures := okFeatures + wangUrbanCanyonHits + teleportationHits
+		log.Printf("PREPROCESS: wangUrbanCanyonHits: %d (%0.1f%%), teleportationHits: %d (%0.1f%%), okFeatures: %d (%0.1f%%)\n",
+			wangUrbanCanyonHits, (float64(wangUrbanCanyonHits)/float64(totalFeatures))*100.0,
+			teleportationHits, (float64(teleportationHits)/float64(totalFeatures))*100.0,
+			okFeatures, (float64(okFeatures)/float64(totalFeatures))*100.0)
+	}()
 
 loop:
 	for {
 		select {
-		case f := <-processedCh:
+		case f := <-teleProcessedCh:
 			if f == nil {
 				continue
 			}
+			okFeatures++
 			j, err := f.MarshalJSON()
 			if err != nil {
 				log.Fatalln(err)
@@ -390,9 +470,14 @@ loop:
 			}
 		case err := <-errCh:
 			log.Println(err)
-		case err := <-procErrCh:
-			log.Println(err)
-		case <-doneCh:
+		case <-wangProcErrCh:
+			wangUrbanCanyonHits++
+			//log.Println(err)
+
+		case <-teleProcErrCh:
+			teleportationHits++
+			//log.Println(err)
+		case <-teleDoneCh:
 			break loop
 		}
 	}

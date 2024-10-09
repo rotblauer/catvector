@@ -72,9 +72,10 @@ process() {
     | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"'),#(properties.Accuracy<100)' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
-    | ${BUILD_TARGET} --urban-canyon-distance=200 preprocess \
+    | ${BUILD_TARGET} --urban-canyon-distance=200 --teleport-factor=10 --teleport-interval-max=120s \
+       preprocess \
     | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=15 --trip-start-interval=30s --speed-threshold=0.5 \
-       -cpuprofile=/tmp/tripdetector.prof trip-detector \
+       trip-detector \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/tripdetected/batch-${batch_id}.json.gz" \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
@@ -157,8 +158,11 @@ http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf
 mbtileserver --port 3001 --cors '*' -d /home/ia/tdata/local/catvector/batch-042x --verbose --enable-fs-watch
 
 
-pprof -web ./build/bin/catvector /tmp/tripdetector.prof
+Use profiling with tripdetector:
+-cpuprofile=/tmp/tripdetector.prof tripdetector
 
+Then open/run:
+pprof -web ./build/bin/catvector /tmp/tripdetector.prof
 
 EOF
 
