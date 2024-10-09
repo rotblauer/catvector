@@ -75,6 +75,7 @@ process() {
     | ${BUILD_TARGET} --urban-canyon-distance=200 preprocess \
     | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=15 --trip-start-interval=30s --speed-threshold=0.5 \
        -cpuprofile=/tmp/tripdetector.prof trip-detector \
+    | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/tripdetected/batch-${batch_id}.json.gz" \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
         | ${BUILD_TARGET} --dwell-interval=120s points-to-linestrings \

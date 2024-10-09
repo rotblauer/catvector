@@ -247,7 +247,13 @@ func (t *LineStringBuilder) IsDiscontinuous(f *geojson.Feature) (isDiscontinuous
 	// Split any tracks separated by the DWELL INTERVAL in time,
 	// or any non-chronological points.
 	span := timespan(t.LastFeature(), f)
-	if span < 0 {
+	// Use a small buffer to account for floating point errors and time imperfections
+	// coming from the cat tracker herself.
+	// When we test strictly (< 0), small chrono-overlaps in reported
+	// points' reported times will cause over-breaking of linestrings,
+	// ie 12:03.02 and 12:03.99. We want to avoid this, and treat
+	// these as continuous.
+	if span.Seconds() < -1 {
 		log.Println("WARN: linestring feature not chronological",
 			mustGetTime(t.LastFeature(), "Time"),
 			mustGetTime(f, "Time"),

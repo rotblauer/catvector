@@ -141,7 +141,8 @@ func (sc *StopConsolidator) AddFeature(f *geojson.Feature) TrackGeoJSON {
 		return sc.StopPoint
 	}
 	// If the feature is not chronological, reset the state.
-	if !mustGetTime(sc.LastFeature(), "Time").Before(mustGetTime(f, "Time")) {
+	delta := mustGetTime(f, "Time").Sub(mustGetTime(sc.LastFeature(), "Time"))
+	if delta.Seconds() < -1 {
 		sc.Reset()
 		return sc.AddFeature(f)
 	}

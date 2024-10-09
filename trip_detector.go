@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/montanaflynn/stats"
 	"github.com/paulmach/orb/planar"
 	"math"
 	"time"
@@ -39,10 +38,10 @@ type TripDetector struct {
 	segmentIntersectionGauge float64
 }
 
-func NewTripDetector(dwellTime, tripStartTime time.Duration, speedThreshold, dwellDistance float64) *TripDetector {
+func NewTripDetector(dwellTime, tripStartInterval time.Duration, speedThreshold, dwellDistance float64) *TripDetector {
 	return &TripDetector{
 		DwellTime:         dwellTime,
-		TripStartInterval: tripStartTime,
+		TripStartInterval: tripStartInterval,
 		SpeedThreshold:    speedThreshold,
 		DwellDistance:     dwellDistance,
 		Tripping:          false,
@@ -492,21 +491,30 @@ func (d *TripDetector) DetectStopOverlaps(f *geojson.Feature) (result DetectedT)
 func (d *TripDetector) DetectStopReportedSpeeds(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
-	referenceSpeeds := d.intervalPoints.ReportedSpeeds(t.MustGetTime().Add(-d.TripStartInterval))
-	if len(referenceSpeeds) == 0 {
-		return detectedNeutral
-	}
-	// Get the statistics for this range.
-	referenceStats := stats.Float64Data(referenceSpeeds)
-	mean, _ := referenceStats.Mean()
-	median, _ := referenceStats.Median()
-	if mean > d.SpeedThreshold {
-		return detectedTrip
-	}
-	if median < d.SpeedThreshold {
+	speed := t.Properties.MustFloat64("Speed")
+	if speed < d.SpeedThreshold*0.8 {
 		return detectedStop
 	}
+	if speed > d.SpeedThreshold*1.2 {
+		return detectedTrip
+	}
 	return detectedNeutral
+
+	//referenceSpeeds := d.intervalPoints.ReportedSpeeds(t.MustGetTime().Add(-d.TripStartInterval))
+	//if len(referenceSpeeds) == 0 {
+	//	return detectedNeutral
+	//}
+	//// Get the statistics for this range.
+	//referenceStats := stats.Float64Data(referenceSpeeds)
+	//mean, _ := referenceStats.Mean()
+	//median, _ := referenceStats.Median()
+	//if mean > d.SpeedThreshold {
+	//	return detectedTrip
+	//}
+	//if median < d.SpeedThreshold {
+	//	return detectedStop
+	//}
+	//return detectedNeutral
 }
 
 func (d *TripDetector) DetectStopReportedActivities(f *geojson.Feature) (result DetectedT) {
