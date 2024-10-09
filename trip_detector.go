@@ -21,7 +21,7 @@ const segmentBoundEpsilon = 1e-5
 // Stops are defined as a series of points that are stationary, structured as Points.
 type TripDetector struct {
 	DwellTime                                time.Duration
-	TripStartTime                            time.Duration
+	TripStartInterval                        time.Duration
 	SpeedThreshold                           float64
 	DwellDistance                            float64
 	lastNPoints                              TracksGeoJSON
@@ -41,13 +41,13 @@ type TripDetector struct {
 
 func NewTripDetector(dwellTime, tripStartTime time.Duration, speedThreshold, dwellDistance float64) *TripDetector {
 	return &TripDetector{
-		DwellTime:      dwellTime,
-		TripStartTime:  tripStartTime,
-		SpeedThreshold: speedThreshold,
-		DwellDistance:  dwellDistance,
-		Tripping:       false,
-		lastNPoints:    TracksGeoJSON{},
-		intervalPoints: TracksGeoJSON{},
+		DwellTime:         dwellTime,
+		TripStartInterval: tripStartTime,
+		SpeedThreshold:    speedThreshold,
+		DwellDistance:     dwellDistance,
+		Tripping:          false,
+		lastNPoints:       TracksGeoJSON{},
+		intervalPoints:    TracksGeoJSON{},
 	}
 }
 
@@ -492,7 +492,7 @@ func (d *TripDetector) DetectStopOverlaps(f *geojson.Feature) (result DetectedT)
 func (d *TripDetector) DetectStopReportedSpeeds(f *geojson.Feature) (result DetectedT) {
 	t := &TrackGeoJSON{f}
 
-	referenceSpeeds := d.intervalPoints.ReportedSpeeds(t.MustGetTime().Add(-d.TripStartTime))
+	referenceSpeeds := d.intervalPoints.ReportedSpeeds(t.MustGetTime().Add(-d.TripStartInterval))
 	if len(referenceSpeeds) == 0 {
 		return detectedNeutral
 	}
@@ -554,23 +554,29 @@ func isGyroscopicallyStable(f *geojson.Feature) (stable, valid bool) {
 }
 
 func (d *TripDetector) DetectStopGyroscope(f *geojson.Feature) (result DetectedT) {
-	// Iterate all dwell interval points backwards.
-	// If the point has gyroscopic data, we will use it to determine if the trip has stopped.
-	// If gyroscopically stable points are detected and span 30s continuously,
-	// we consider the trip certainly stopped.
-	t := &TrackGeoJSON{f}
-	tt := t.MustGetTime()
-	if delta := tt.Sub(d.continuousGyroscopicStabilityGaugeCursor).Seconds(); delta > 0 {
-		d.continuousGyroscopicStabilityGaugeCursor = tt
+	//// If the point has gyroscopic data, we will use it to determine if the trip has stopped.
+	//// If gyroscopically stable points are detected and span 30s continuously,
+	//// we consider the trip certainly stopped.
 
-		stable, valid := isGyroscopicallyStable(f)
-		if stable && valid {
-			d.continuousGyroscopicStabilityGauge += delta
-		} else {
-			d.continuousGyroscopicStabilityGauge = 0
-		}
-	}
-	if d.continuousGyroscopicStabilityGauge >= GyroscopeStableThresholdTime.Seconds() {
+	//t := &TrackGeoJSON{f}
+	//tt := t.MustGetTime()
+	//if delta := tt.Sub(d.continuousGyroscopicStabilityGaugeCursor).Seconds(); delta > 0 {
+	//	d.continuousGyroscopicStabilityGaugeCursor = tt
+	//
+	//	stable, valid := isGyroscopicallyStable(f)
+	//	if stable && valid {
+	//		d.continuousGyroscopicStabilityGauge += delta
+	//	} else {
+	//		d.continuousGyroscopicStabilityGauge = 0
+	//	}
+	//}
+	//if d.continuousGyroscopicStabilityGauge >= GyroscopeStableThresholdTime.Seconds() {
+	//	return detectedStop
+	//}
+	//return detectedNeutral
+
+	// Or, a simpler way.?
+	if stable, valid := isGyroscopicallyStable(f); stable && valid {
 		return detectedStop
 	}
 	return detectedNeutral

@@ -73,7 +73,8 @@ process() {
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"'),#(properties.Accuracy<100)' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
     | ${BUILD_TARGET} --urban-canyon-distance=200 preprocess \
-    | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=15 --trip-start-interval=30s --speed-threshold=0.5 trip-detector \
+    | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=15 --trip-start-interval=30s --speed-threshold=0.5 \
+       -cpuprofile=/tmp/tripdetector.prof trip-detector \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
         | ${BUILD_TARGET} --dwell-interval=120s points-to-linestrings \
@@ -153,6 +154,10 @@ http://localhost:8080/public/?vector=http://localhost:3001/services/rye/naps/til
 http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf
 
 mbtileserver --port 3001 --cors '*' -d /home/ia/tdata/local/catvector/batch-042x --verbose --enable-fs-watch
+
+
+pprof -web ./build/bin/catvector /tmp/tripdetector.prof
+
 
 EOF
 

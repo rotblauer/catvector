@@ -132,12 +132,15 @@ func (f *TrackGeoJSON) MustGetSpeed() float64 {
 }
 
 func (f *TrackGeoJSON) MustGetTime() time.Time {
-	t := f.Feature.Properties.MustString("Time")
-	out, err := time.Parse(time.RFC3339, t)
-	if err != nil {
-		panic(err)
-	}
-	return out
+	t := f.Feature.Properties.MustInt("UnixTime")
+	return time.Unix(int64(t), 0)
+
+	//t := f.Feature.Properties.MustString("Time")
+	//out, err := time.Parse(time.RFC3339, t)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//return out
 }
 
 func (f *TrackGeoJSON) After(t time.Time) bool {

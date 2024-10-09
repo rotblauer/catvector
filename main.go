@@ -23,6 +23,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime/pprof"
 	"sync"
 	"time"
 
@@ -221,6 +222,16 @@ loop:
 }
 
 func cmdTripDetector(i io.ReadCloser, o io.WriteCloser) {
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	uuidTripDetectors := map[string]*TripDetector{}
 	featureCh, errCh, closeCh := readStreamWithFeatureCallback(i, nil)
 loop:
@@ -447,8 +458,11 @@ loop:
 	}
 }
 
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
 func main() {
 	flag.Parse()
+
 	command := flag.Arg(0)
 	switch command {
 	case "validate":

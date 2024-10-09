@@ -27,7 +27,6 @@ tippeargs=(
     --include Accuracy
     --include Speed
 
-    --include IsTrip
     --include Duration
     -EDuration:sum
     --include Count
@@ -37,7 +36,8 @@ tippeargs=(
     --include P99Dist
     --include Area
 
-#    --include MotionStateReason
+    --include IsTrip
+    --include MotionStateReason
 
     --single-precision
     --generate-ids
