@@ -200,10 +200,7 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 	idG := d.DetectStopGyroscope(f)
 	idNI := d.DetectStopNetworkInfo(f)
 
-	d.MotionStateReason = fmt.Sprintf(`idPC: %v, idPCC: %v,
-idX: %v, idO: %v, 
-idRS: %v, idA: %v,
-idG: %v, idNI: %v`,
+	d.MotionStateReason = fmt.Sprintf(`idPC: %v, idPCC: %v, idX: %v, idO: %v, idRS: %v, idA: %v, idG: %v, idNI: %v`,
 		idPC, idPCC, idX, idO, idRS, idA, idG, idNI)
 
 	weight += idPC

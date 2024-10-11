@@ -32,7 +32,7 @@ main() {
   #     Shoulda also nota the batch size.
   local batch_id="batch-044"
   local kitty
-  for kitty in rye ia; do
+  for kitty in rye; do
     export CAT_ONE="${kitty}"
 
     # FORK ALERT: Below are two forking chunks of code.
@@ -45,14 +45,14 @@ main() {
     # --------------------------------------------------
     # FORK 1/2: This chunk concatenates the batch files into a single reference file.
     # --------------------------------------------------
-#    export OUTPUT_ROOT="$HOME/tdata/local/catvector/${batch_id}x"
-#    export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
+#    export OUTPUT_ROOT="$HOME/tdata/local/catvector/experiment1"
+    export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
 #    export TRACKS_SOURCE_GZ="${OUTPUT_REFERENCE}"
 #
 #    # Derive the trial file from the pre-generated batch_id-wildcard batch files.
 #    # Concat gz files.
-#    export CONCATS="${HOME}/tdata/local/catvector/gen/${CAT_ONE}/valid/${batch_id}"
-#
+#    export CONCATS="${HOME}/tdata/local/catvector/catvector-20241008/direct-master/ia/valid.json.gz"
+##
 #    set -x
 #    mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
 #    >"${OUTPUT_REFERENCE}"
@@ -67,7 +67,8 @@ main() {
     # OUTPUT_ROOT is the root directory for the data output of this run.
     # Change this to match the source data for this run.
 #     export OUTPUT_ROOT="$HOME/tdata/local/catvector/edge"
-    export OUTPUT_ROOT="$HOME/tdata/local/catvector/direct-master"
+#    export OUTPUT_ROOT="$HOME/tdata/local/catvector/direct-master"
+    export OUTPUT_ROOT="$HOME/tdata/local/catvector/20241008"
     # OUTPUT_REFERENCE is a copy of the source data for some run.
     # Probably don't change this.
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
@@ -80,7 +81,8 @@ main() {
     set -x
     mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
 #    cp "${HOME}/tdata/edge.json.gz" "${OUTPUT_REFERENCE}"
-    cp "${HOME}/tdata/direct-master.json.gz" "${OUTPUT_REFERENCE}"
+#    cp "${HOME}/tdata/direct-master.json.gz" "${OUTPUT_REFERENCE}"
+    cp "${HOME}/tdata/local/catvector-20241008/direct-master/rye/valid.json.gz" "${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
 
     ## Run the scripts.

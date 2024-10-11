@@ -788,10 +788,11 @@ func readStreamWithFeatureCallback(reader io.Reader, callback func(*geojson.Feat
 	errChan := make(chan error)
 	closeCh := make(chan struct{}, 1)
 
-	breader := bufio.NewReaderSize(reader, 4096*256)
+	breader := bufio.NewReaderSize(reader, 4096*512)
 
 	go func() {
 		for {
+
 			read, err := breader.ReadBytes('\n')
 			if err != nil {
 				if errors.Is(err, os.ErrClosed) || errors.Is(err, io.EOF) {

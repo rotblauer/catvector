@@ -68,11 +68,11 @@ process() {
 
   #    | ${BUILD_TARGET} rkalman \
   echo >&2 "Processing category: ${CAT_ONE}, batch: ${batch_id}"
-  ${BUILD_TARGET} validate \
-    | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
-    | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"'),#(properties.Accuracy<100)' \
-    | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
-    | ${BUILD_TARGET} --urban-canyon-distance=200 --teleport-factor=10 --teleport-interval-max=120s \
+#  ${BUILD_TARGET} validate \
+#    | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
+#    | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"'),#(properties.Accuracy<100)' \
+#    | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
+    ${BUILD_TARGET} --urban-canyon-distance=200 --teleport-factor=10 --teleport-interval-max=60s \
        preprocess \
     | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=15 --trip-start-interval=30s --speed-threshold=0.5 \
        trip-detector \
