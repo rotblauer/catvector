@@ -853,7 +853,9 @@ func readStreamWithFeatureCallback(reader io.Reader, callback func(*geojson.Feat
 					continue
 				}
 				// We ONLY SEND THE FEATURE IF IT'S NOT NIL.
-				featureChan <- out
+				if out != nil {
+					featureChan <- out
+				}
 			} else {
 				// No callback, send the feature.
 				featureChan <- pointFeature

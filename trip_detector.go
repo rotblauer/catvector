@@ -188,13 +188,13 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 			d.MotionStateReason = "signal loss"
 			return nil
 		}
+	} else {
+		//// Last was nil, so we are starting over.
+		//// This results in the first point
+		//// having "init" as the motionstatereason.
+		//d.MotionStateReason = "init"
+		//return nil
 	}
-	//else {
-	//	// Last was nil, so we are starting over.
-	//	// FIXME: this results in the first point
-	//	// having "init" as the motionstatereason
-	//	return nil
-	//}
 
 	weight := detectedNeutral
 	idPC := d.DetectStopPointClustering(f)

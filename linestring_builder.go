@@ -163,12 +163,12 @@ func calculatedAverageAccuracy(pointFeatures []*geojson.Feature) float64 {
 	return sum / float64(len(pointFeatures))
 }
 
-func getTraversedElevations(pointFeatures []*geojson.Feature) (up, dn float64) {
+func getTraversedElevationsRound(pointFeatures []*geojson.Feature) (up, dn float64) {
 	if len(pointFeatures) < 2 {
 		return 0, 0
 	}
 	for i := 1; i < len(pointFeatures); i++ {
-		delta := pointFeatures[i].Properties["Elevation"].(float64) - pointFeatures[i-1].Properties["Elevation"].(float64)
+		delta := math.Round(pointFeatures[i].Properties["Elevation"].(float64)) - math.Round(pointFeatures[i-1].Properties["Elevation"].(float64))
 		if delta > 0 {
 			up += delta
 		} else {
@@ -201,7 +201,7 @@ func (t *LineStringBuilder) AddPointFeatureToLastLinestring(f *geojson.Feature) 
 	t.LineStringFeature.Properties["DistanceTraversed"] = toFixed(t.LineStringFeature.Properties["DistanceTraversed"].(float64)+getTraversedDistance(t.LineStringFeatures[len(t.LineStringFeatures)-2:]), 2)
 	t.LineStringFeature.Properties["AverageCalculatedSpeed"] = toFixed(t.LineStringFeature.Properties["DistanceTraversed"].(float64)/durationSeconds, 2)
 
-	up, dn := getTraversedElevations(t.LineStringFeatures[len(t.LineStringFeatures)-2:])
+	up, dn := getTraversedElevationsRound(t.LineStringFeatures[len(t.LineStringFeatures)-2:])
 	t.LineStringFeature.Properties["ElevationGain"] = toFixed(t.LineStringFeature.Properties["ElevationGain"].(float64)+up, 2)
 	t.LineStringFeature.Properties["ElevationLoss"] = toFixed(t.LineStringFeature.Properties["ElevationLoss"].(float64)+dn, 2)
 }
