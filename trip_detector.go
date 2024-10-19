@@ -20,7 +20,6 @@ const segmentBoundEpsilon = 1e-5
 // Stops are defined as a series of points that are stationary, structured as Points.
 type TripDetector struct {
 	DwellTime                                time.Duration
-	TripStartInterval                        time.Duration
 	SpeedThreshold                           float64
 	DwellDistance                            float64
 	lastNPoints                              TracksGeoJSON
@@ -38,12 +37,11 @@ type TripDetector struct {
 	segmentIntersectionGauge float64
 }
 
-func NewTripDetector(dwellTime, tripStartInterval time.Duration, speedThreshold, dwellDistance float64) *TripDetector {
+func NewTripDetector(dwellTime time.Duration, speedThreshold, dwellDistance float64) *TripDetector {
 	return &TripDetector{
-		DwellTime:         dwellTime,
-		TripStartInterval: tripStartInterval,
-		SpeedThreshold:    speedThreshold,
-		DwellDistance:     dwellDistance,
+		DwellTime:      dwellTime,
+		SpeedThreshold: speedThreshold,
+		DwellDistance:  dwellDistance,
 
 		lastNPoints:    TracksGeoJSON{},
 		intervalPoints: TracksGeoJSON{},

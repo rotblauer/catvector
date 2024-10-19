@@ -128,7 +128,6 @@ loop:
 var flagDwellInterval = flag.Duration("dwell-interval", 10*time.Second, "stop detection interval")
 var flagDwellDistanceThresholdDefault = 10.0
 var flagDwellDistanceThreshold = flag.Float64("dwell-distance", flagDwellDistanceThresholdDefault, "cluster distance threshold for trip stops")
-var flagTripStartInterval = flag.Duration("trip-start-interval", 30*time.Second, "start detection interval")
 var flagTrackerSpeedThreshold = flag.Float64("speed-threshold", 0.5, "speed threshold for trip detection")
 
 func cmdPointsToLineStrings(i io.ReadCloser, o io.WriteCloser) {

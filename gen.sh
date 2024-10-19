@@ -74,7 +74,7 @@ process() {
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
     | ${BUILD_TARGET} --urban-canyon-distance=200 --teleport-factor=10 --teleport-interval-max=60s \
        preprocess \
-    | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=50 --trip-start-interval=30s --speed-threshold=0.5 \
+    | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=50 --speed-threshold=0.5 \
        trip-detector \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/tripdetected/batch-${batch_id}.json.gz" \
     | gfilter --ignore-invalid --match-none '#(properties.MotionStateReason=="init"),#(properties.MotionStateReason=="reset")' \
