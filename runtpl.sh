@@ -10,9 +10,9 @@ TILESET_NAME=${2:-$(basename $OUTPUT_FILE .mbtiles)}
 LAYER_NAME=${3:-$(basename $OUTPUT_FILE .mbtiles)}
 
 tippeargs=(
-    --maximum-tile-bytes 500000 # default 500000
+    --maximum-tile-bytes 750000 # default 500000
+#    --drop-densest-as-needed
     --drop-smallest-as-needed
-    --drop-densest-as-needed
     --minimum-zoom 3
     --maximum-zoom 18 # 1me
 
@@ -33,6 +33,8 @@ tippeargs=(
     --include ElevationGain
     --include ElevationLoss
     --include MotionStateReason
+
+    --order-by UnixTime
 
     --single-precision
     --generate-ids

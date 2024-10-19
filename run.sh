@@ -32,7 +32,7 @@ main() {
   #     Shoulda also nota the batch size.
   local batch_id="batch-044"
   local kitty
-  for kitty in rye; do
+  for kitty in ia; do
     export CAT_ONE="${kitty}"
 
     # FORK ALERT: Below are two forking chunks of code.
@@ -66,9 +66,9 @@ main() {
     # --------------------------------------------------
     # OUTPUT_ROOT is the root directory for the data output of this run.
     # Change this to match the source data for this run.
-#     export OUTPUT_ROOT="$HOME/tdata/local/catvector/edge"
+     export OUTPUT_ROOT="$HOME/tdata/local/catvector/edge"
 #    export OUTPUT_ROOT="$HOME/tdata/local/catvector/direct-master"
-    export OUTPUT_ROOT="$HOME/tdata/local/catvector/20241008"
+#    export OUTPUT_ROOT="$HOME/tdata/local/catvector/20241008"
     # OUTPUT_REFERENCE is a copy of the source data for some run.
     # Probably don't change this.
     export OUTPUT_REFERENCE="${OUTPUT_ROOT}/${CAT_ONE}/reference.json.gz"
@@ -80,9 +80,9 @@ main() {
     # MODIFY THIS TO CHANGE THE SOURCE DATA FOR THIS RUN.
     set -x
     mkdir -p "$(dirname "${OUTPUT_REFERENCE}")"
-#    cp "${HOME}/tdata/edge.json.gz" "${OUTPUT_REFERENCE}"
+    cp "${HOME}/tdata/edge.json.gz" "${OUTPUT_REFERENCE}"
 #    cp "${HOME}/tdata/direct-master.json.gz" "${OUTPUT_REFERENCE}"
-    cp "${HOME}/tdata/local/catvector-20241008/direct-master/rye/valid.json.gz" "${OUTPUT_REFERENCE}"
+#    cp "${HOME}/tdata/local/catvector-20241008/direct-master/rye/valid.json.gz" "${OUTPUT_REFERENCE}"
     { set +x; } 2>/dev/null
 
     ## Run the scripts.

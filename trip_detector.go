@@ -542,6 +542,7 @@ var GyroscopeStableThresholdTime = 30 * time.Second
 
 // isGyroscopicallyStable returns true if the feature is considered stable by the gyroscope.
 // Valid is returned true only if all gyroscope attributes exist on the feature.
+// Only gcps (the Android cat tracker) will have gyroscope readings.
 func isGyroscopicallyStable(f *geojson.Feature) (stable, valid bool) {
 	sum := 0.0
 	for _, prop := range gyroscopeProps {
@@ -558,10 +559,17 @@ func isGyroscopicallyStable(f *geojson.Feature) (stable, valid bool) {
 	return sum < GyroscopeStableThresholdReading, true
 }
 
+// DetectStopGyroscope is a method that identifies trip ends with gyroscope readings.
+// We assume that a stable gyroscope reading indicates a stationary cat.
+// This function uses atomic measurements; it does not consider the time dimension (ie how long the gyroscope has been stable),
+// although that implementation is commented below because it might be better than atomic
+// because there are "flashes" of stability that might be noisy. The time dimension would smooth this out.
+// Theoretically I don't believe that there is any way for a good zero-sum gyroscope reading to come from
+// anything besides a completely resting cat, so the result of this function might do well with a confidence weight.
 func (d *TripDetector) DetectStopGyroscope(f *geojson.Feature) (result DetectedT) {
-	//// If the point has gyroscopic data, we will use it to determine if the trip has stopped.
-	//// If gyroscopically stable points are detected and span 30s continuously,
-	//// we consider the trip certainly stopped.
+
+	// If gyroscopically stable points are detected and span 30s continuously,
+	// we consider the trip certainly stopped.
 
 	//t := &TrackGeoJSON{f}
 	//tt := t.MustGetTime()
@@ -591,6 +599,11 @@ type NetworkInfo struct {
 	SSID string `json:"ssid"`
 }
 
+// DetectStopNetworkInfo is a method that identifies trip ends with network (Wi-Fi) information.
+// We assume that if a cat connects to Wi-Fi it is stationary.
+// This assumption could fail...
+// - if a cat is using a mobile hotspot on the road,
+// - or if a cat is connected to a wide-area Wi-Fi network, like city Wi-Fi or even airport Wi-Fi.
 func (d *TripDetector) DetectStopNetworkInfo(f *geojson.Feature) (result DetectedT) {
 	if v, ok := f.Properties["NetworkInfo"]; ok {
 		if s, ok := v.(string); ok {

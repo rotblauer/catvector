@@ -1,7 +1,7 @@
 Turns cat tracks into cat vectors -- geojson linestrings.
 
 This project is primarily intended to develop a trip detection pipeline.
-Trips are represented as linestrings, and non-trips (stops/visits/naps/pauses)
+Trips are represented as linestrings, and non-trips (stops/visits/naps/pauses)/
 can be represented as points.
 
 `cmdTripDetector` is the initial and, at the time of writing, the current state of the art.
@@ -17,6 +17,15 @@ Use [cattracks-explorer](https://github.com/rotblauer/cattracks-explorer) to vis
 - http://localhost:8080/public/?vector=http://localhost:3001/services/rye/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf
 
 ---
+
+20241018
+
+- [ ] All `populate/` cattracks should organize to `cat/` subdirs. 
+- [ ] (Refactor catm2 to organize subdirectories for `cat/`.)
+  - Level 23
+  - Level 16
+- [ ] Add dedicated `cat/snaps` layers.
+- [ ] Put laps into a Postgres+PostGIS DB? 
 
 20241005
 

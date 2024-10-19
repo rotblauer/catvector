@@ -25,7 +25,10 @@ postprocess() {
   # Concat all the files into one, for both linestrings and points.
   cat "${OUTPUT_ROOT_CAT_ONE}"/linestrings/*.json.gz \
     | tee -a "${OUTPUT_ROOT_CAT_ONE}/linestrings.json.gz" \
-    | zcat | ${script_dir}/runtpl.sh "${OUTPUT_ROOT_CAT_ONE}/laps.mbtiles" || true
+    | zcat \
+    | gfilter --match-all '#(properties.PointCount>30),#(properties.Duration<86000),#(properties.Duration>120),#(properties.AverageAccuracy<25)' \
+    | gfilter --match-any '#(properties.Activity!="Stationary"),#(properties.DistanceAbsolute>100),#(properties.DistanceTraversed>250)' \
+    | ${script_dir}/runtpl.sh "${OUTPUT_ROOT_CAT_ONE}/laps.mbtiles" || true
 
   # This can fail because I'm not handling points right now
   # in the pipeline.
@@ -45,10 +48,10 @@ postprocess() {
 
 #  # Map the VALID points. These are all points.
 #  # They are useful for comparing the laps and naps against the "raw" data.
-#  [[ -d "${OUTPUT_ROOT_CAT_ONE}"/valid ]] \
-#  && cat "${OUTPUT_ROOT_CAT_ONE}"/valid/*.json.gz \
-#    | tee -a "${OUTPUT_ROOT_CAT_ONE}/valid.json.gz" \
-#    | zcat | ${script_dir}/runtpp.sh "${OUTPUT_ROOT_CAT_ONE}/valid.mbtiles"
+  [[ -d "${OUTPUT_ROOT_CAT_ONE}"/valid ]] \
+  && cat "${OUTPUT_ROOT_CAT_ONE}"/valid/*.json.gz \
+    | tee -a "${OUTPUT_ROOT_CAT_ONE}/valid.json.gz" \
+    | zcat | ${script_dir}/runtpp.sh "${OUTPUT_ROOT_CAT_ONE}/valid.mbtiles"
 
   # Remove the intermediate files.
   #     rm -rf "${OUTPUT_ROOT_CAT_ONE}"/linestrings
@@ -56,3 +59,24 @@ postprocess() {
 }
 
 postprocess
+
+doc(){
+  cat <<EOF
+                addLayerObject.type = 'line';
+                addLayerObject.paint = paintFor('line');
+                addLayerObject.filter = [
+                    'all',
+                    ['>', 'PointCount', 30],
+                    ['<', 'Duration', 86000],
+                    ['>', 'Duration', 120],
+                    ['<', 'AverageAccuracy', 25],
+                    [
+                        'any',
+                        ['!=', 'Activity', 'Stationary'],
+                        ['>=', 'DistanceAbsolute', 100],
+                        ['>=', 'DistanceTraversed', 250],
+                    ],
+
+                    // ['==', 'Activity', '
+EOF
+}

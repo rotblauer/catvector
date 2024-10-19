@@ -406,10 +406,10 @@ func teleportationFilterStream(featuresCh chan *geojson.Feature, closingCh chan 
 		calculatedSpeed := dist / span.Seconds()
 		reportedSpeed := f.Properties.MustFloat64("Speed")
 		if calculatedSpeed > reportedSpeed*(*flagTeleportFactor) {
-			j, _ := json.Marshal(f)
-			errChan <- fmt.Errorf("teleportation point: %s", string(j))
+			errChan <- fmt.Errorf("teleportation point: %v", f.Properties["Time"])
 			return
 		}
+
 		// Else the last and cursor points passed the teleportation challenge!
 		// They are near enough in time and space.
 		lastFeature = f
@@ -542,6 +542,39 @@ loop:
 		}
 	}
 }
+
+//// cmdFilterBoundingBox is an experiment to filter out linestrings which are busy rats' nests
+//// inside of small bounding boxes. The idea is to filter out linestrings which are too dense.
+//// The bounding box is calculated from the linestring's bound.
+//// If the bounding box is smaller than a certain threshold, the linestring is filtered out.
+//func cmdFilterBoundingBox(i io.ReadCloser, o io.WriteCloser) {
+//	featureCh, errCh, closeCh := readStreamWithFeatureCallback(i, nil)
+//loop:
+//	for {
+//		select {
+//		case f := <-featureCh:
+//			if f == nil {
+//				continue
+//			}
+//			if ln, ok := f.Geometry.(orb.LineString); ok {
+//				bound := ln.Bound()
+//
+//			}
+//			j, err := f.MarshalJSON()
+//			if err != nil {
+//				log.Fatalln(err)
+//			}
+//			j = append(j, []byte("\n")...)
+//			if _, err := o.Write(j); err != nil {
+//				log.Fatalln(err)
+//			}
+//		case err := <-errCh:
+//			log.Println(err)
+//		case <-closeCh:
+//			break loop
+//		}
+//	}
+//}
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
