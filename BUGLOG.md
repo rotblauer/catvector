@@ -29,7 +29,6 @@ It was at a traffic light on Higgins, where we had actually stopped briefly (for
 Tippecanoe had a `clustered=6` point near the break, and which I could not uncluster
 with tippe settings at `--maximum-tile-bytes 1000000`.
 We see in the source that there are 6 sequential points at `(-113.9924033,46.871675|-113.9924033,46.871675)`.
- 
 
 I possibly have not handled the "sequential points on top of each other" case,
 so it could be a pseudo-stop (nap) that is getting filtered somewhere.
@@ -37,7 +36,7 @@ so it could be a pseudo-stop (nap) that is getting filtered somewhere.
 It is also possible that the `TripDetector` instance is new at this point; 
 in fact, I saw `MotionStateReason: init` there. So it's possible that
 this break is attributable to `PARALLEL_BATCH_SIZE`.
-Although it seems highly coincidental that the `%10000000` would fall
+Although it seems highly coincidental that the `%100000` would fall
 at this unique (?) stoplight.
 
 Confirmed `MotionStateReason: "init"`.
@@ -45,3 +44,9 @@ So the `TripDetector` is `new`.
 So this is a seam in the pipeline,
 and has to do with batching and program instantiation.
 It is not a "sequential points on top of each other" problem.
+
+Confirmed: re-ran the pipeline with a lower, non mod 100k batch size and 
+indeed the spurious break was gone. 
+```bash
+time env PARALLEL_JOBS=8 PARALLEL_BATCH_SIZE=80000 ./run.sh |& tee run.out
+```
