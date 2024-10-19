@@ -183,10 +183,10 @@ func (t *LineStringBuilder) AddPointFeatureToLastLinestring(f *geojson.Feature) 
 	t.LineStringFeature.Geometry = append(t.LineStringFeature.Geometry.(orb.LineString), f.Point())
 	t.LineStringFeatures = append(t.LineStringFeatures, f)
 
-	// TODO: update properties properly
-	for k, v := range f.Properties {
-		t.LineStringFeature.Properties[k] = v
-	}
+	// Atomic (individual) values.
+	t.LineStringFeature.Properties["EndTime"] = f.Properties["Time"]
+	t.LineStringFeature.Properties["UnixEndTime"] = f.Properties["UnixTime"]
+	t.LineStringFeature.Properties["MotionStateReasonEnd"] = f.Properties["MotionStateReason"]
 
 	// Values which require the entire linestring to be calculated.
 	durationSeconds := timespan(t.LineStringFeatures[0], f).Round(time.Second).Seconds()
@@ -221,9 +221,13 @@ func (t *LineStringBuilder) AddPointFeatureToNewLinestring(f *geojson.Feature) {
 	for k, v := range f.Properties {
 		t.LineStringFeature.Properties[k] = v
 	}
+
+	t.LineStringFeature.Properties["Name"] = f.Properties["Name"]
+	t.LineStringFeature.Properties["UUID"] = f.Properties["UUID"]
+
 	t.LineStringFeature.Properties["StartTime"] = f.Properties["Time"]
 	t.LineStringFeature.Properties["Duration"] = 0.0
-	t.LineStringFeature.Properties["MotionStateReason"] = f.Properties["MotionStateReason"]
+	t.LineStringFeature.Properties["MotionStateReasonStart"] = f.Properties["MotionStateReason"]
 	t.LineStringFeature.Properties["DistanceTraversed"] = 0.0
 	t.LineStringFeature.Properties["ElevationGain"] = 0.0
 	t.LineStringFeature.Properties["ElevationLoss"] = 0.0

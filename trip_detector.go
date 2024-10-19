@@ -44,9 +44,12 @@ func NewTripDetector(dwellTime, tripStartInterval time.Duration, speedThreshold,
 		TripStartInterval: tripStartInterval,
 		SpeedThreshold:    speedThreshold,
 		DwellDistance:     dwellDistance,
+
+		lastNPoints:    TracksGeoJSON{},
+		intervalPoints: TracksGeoJSON{},
+
 		Tripping:          false,
-		lastNPoints:       TracksGeoJSON{},
-		intervalPoints:    TracksGeoJSON{},
+		MotionStateReason: "init",
 	}
 }
 
@@ -176,19 +179,22 @@ func (d *TripDetector) AddFeature(f *geojson.Feature) error {
 			d.ResetState()
 			return nil
 		}
-	} else {
-		// Last was nil, so we are starting over.
-		return nil
-	}
 
-	// Short-circuit if signal loss is detected.
-	// The tracker went off or lost signal for an appreciable length of time.
-	// A discontinuity by absence of record.
-	if d.IsDetectSignalLoss(f) {
-		d.Tripping = false
-		d.MotionStateReason = "signal loss"
-		return nil
+		// Short-circuit if signal loss is detected.
+		// The tracker went off or lost signal for an appreciable length of time.
+		// A discontinuity by absence of record.
+		if d.IsDetectSignalLoss(f) {
+			d.Tripping = false
+			d.MotionStateReason = "signal loss"
+			return nil
+		}
 	}
+	//else {
+	//	// Last was nil, so we are starting over.
+	//	// FIXME: this results in the first point
+	//	// having "init" as the motionstatereason
+	//	return nil
+	//}
 
 	weight := detectedNeutral
 	idPC := d.DetectStopPointClustering(f)

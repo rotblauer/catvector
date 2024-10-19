@@ -77,6 +77,7 @@ process() {
     | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=50 --trip-start-interval=30s --speed-threshold=0.5 \
        trip-detector \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/tripdetected/batch-${batch_id}.json.gz" \
+    | gfilter --ignore-invalid --match-none '#(properties.MotionStateReason=="init"),#(properties.MotionStateReason=="reset")' \
     | tee >( \
       gfilter --ignore-invalid --match-all '#(properties.IsTrip==true)' \
         | ${BUILD_TARGET} --dwell-interval=120s points-to-linestrings \
@@ -84,7 +85,7 @@ process() {
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/linestrings/batch-${batch_id}.json.gz" \
     ) \
     | tee >( \
-      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false),#(properties.MotionStateReason!="reset")' \
+      gfilter --ignore-invalid --match-all '#(properties.IsTrip==false)' \
         | ${BUILD_TARGET} --dwell-interval=120s --dwell-distance=100 consolidate-stops \
         | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/points/batch-${batch_id}.json.gz" \
     )

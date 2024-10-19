@@ -18,6 +18,7 @@ tippeargs=(
 
 	# Keep these fields
     --include Name
+    --include UUID
     --include Time
     --include StartTime
     --include UnixTime
@@ -32,7 +33,8 @@ tippeargs=(
     --include AverageCalculatedSpeed
     --include ElevationGain
     --include ElevationLoss
-    --include MotionStateReason
+    --include MotionStateReasonStart
+    --include MotionStateReasonEnd
 
     --order-by UnixTime
 

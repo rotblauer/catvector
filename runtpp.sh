@@ -10,7 +10,7 @@ TILESET_NAME=${2:-$(basename $OUTPUT_FILE .mbtiles)}
 LAYER_NAME=${3:-$(basename $OUTPUT_FILE .mbtiles)}
 
 tippeargs=(
-    --maximum-tile-bytes 500000 # default 500000
+    --maximum-tile-bytes 1000000 # default 500000
     --cluster-densest-as-needed
     --cluster-distance=1 # 1px
     --calculate-feature-density
