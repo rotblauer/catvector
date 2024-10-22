@@ -51,21 +51,14 @@ func NewTripDetector(dwellTime time.Duration, speedThreshold, dwellDistance floa
 	}
 }
 
-func (d *TripDetector) LastPointN(n int) *TrackGeoJSON {
-	if len(d.lastNPoints) == 0 {
-		return nil
-	}
-	return d.lastNPoints[len(d.lastNPoints)-1-n]
-}
-
-func (d *TripDetector) IntervalPointsWhere(include func(t *TrackGeoJSON) bool) []*geojson.Feature {
-	out := []*geojson.Feature{}
-	for i := range d.intervalPoints {
-		if include(d.intervalPoints[i]) {
-			out = append(out, d.intervalPoints[i].Feature)
-		}
-	}
-	return out
+func (d *TripDetector) ResetState() {
+	d.Tripping = false
+	d.MotionStateReason = "reset"
+	d.intervalPtsCentroid = orb.Point{}
+	d.lastNPoints = TracksGeoJSON{}
+	d.intervalPoints = TracksGeoJSON{}
+	d.segmentIntersectionGauge = 0
+	d.continuousGyroscopicStabilityGauge = 0
 }
 
 func (d *TripDetector) AddFeatureToState(f *geojson.Feature) {
@@ -96,14 +89,21 @@ func (d *TripDetector) AddFeatureToState(f *geojson.Feature) {
 	d.segmentIntersectionGauge *= 1 - (1.0 / n)
 }
 
-func (d *TripDetector) ResetState() {
-	d.Tripping = false
-	d.MotionStateReason = "reset"
-	d.intervalPtsCentroid = orb.Point{}
-	d.lastNPoints = TracksGeoJSON{}
-	d.intervalPoints = TracksGeoJSON{}
-	d.segmentIntersectionGauge = 0
-	d.continuousGyroscopicStabilityGauge = 0
+func (d *TripDetector) LastPointN(n int) *TrackGeoJSON {
+	if len(d.lastNPoints) == 0 {
+		return nil
+	}
+	return d.lastNPoints[len(d.lastNPoints)-1-n]
+}
+
+func (d *TripDetector) IntervalPointsWhere(include func(t *TrackGeoJSON) bool) []*geojson.Feature {
+	out := []*geojson.Feature{}
+	for i := range d.intervalPoints {
+		if include(d.intervalPoints[i]) {
+			out = append(out, d.intervalPoints[i].Feature)
+		}
+	}
+	return out
 }
 
 // segmentsIntersect returns true if the two line segments intersect.

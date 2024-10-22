@@ -44,17 +44,23 @@ intermediary_gzipping_to() {
 export -f intermediary_gzipping_to
 
 #######################################
-# process the parallelized data, per cat.
+# process the data, per cat.
+# This function cleans and filters the cattracks,
+# assembling them into trips (laps) and stops (naps), represented as
+# linestrings and points.
+# If the function is not run via 'parallel', it will
+# use a default batch_id value of 0, which will not
+# conflict with parallel's initial value of 1.
 # Globals:
 #   BUILD_TARGET
 #   CAT_ONE
 #   OUTPUT_ROOT_CAT_ONE
 # Arguments:
-#  batch_id
+#  batch_id (if unset, will be 0)
 #######################################
 process() {
   local batch_id
-  printf -v batch_id "%05d" "${1}"
+  printf -v batch_id "%05d" "${1:-0}"
   [[ -z "${CAT_ONE}" ]] && echo "CAT_ONE is not set" && exit 1
   [[ -z "${OUTPUT_ROOT_CAT_ONE}" ]] && echo "OUTPUT_ROOT_CAT_ONE is not set" && exit 1
   [[ -z "${BUILD_TARGET}" ]] && echo "BUILD_TARGET is not set" && exit 1
@@ -139,6 +145,7 @@ main() {
 
   mkdir -p "${OUTPUT_ROOT_CAT_ONE}"
   zcat "${OUTPUT_REFERENCE}" | parallel_process
+#  zcat "${OUTPUT_REFERENCE}" | process 0
 
   # We're done, store the hash of the input file to the 'generated' file.
   echo "${hash}" >"${OUTPUT_ROOT_CAT_ONE}/generated"

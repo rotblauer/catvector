@@ -242,7 +242,7 @@ loop:
 			}
 			td, ok := uuidTripDetectors[f.Properties.MustString("UUID")]
 			if !ok {
-				td = NewTripDetector(*flagDwellInterval, *flagTripStartInterval, *flagTrackerSpeedThreshold, *flagDwellDistanceThreshold)
+				td = NewTripDetector(*flagDwellInterval, *flagTrackerSpeedThreshold, *flagDwellDistanceThreshold)
 				uuidTripDetectors[f.Properties.MustString("UUID")] = td
 			}
 			if err := td.AddFeature(f); err != nil {
