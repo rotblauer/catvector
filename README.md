@@ -1,8 +1,8 @@
-Turns cat tracks into cat vectors -- geojson linestrings.
+# catvector
 
 This project is primarily intended to develop a trip detection pipeline.
-Trips are represented as linestrings, and non-trips (stops/visits/naps/pauses)/
-can be represented as points.
+Trips ("laps") are represented as linestrings, 
+and non-trips ("naps") can be represented as points.
 
 `cmdTripDetector` is the initial and, at the time of writing, the current state of the art.
 It was derived largely from some whitepapers I found on trip detection algorithms, and

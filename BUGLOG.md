@@ -50,3 +50,12 @@ indeed the spurious break was gone.
 ```bash
 time env PARALLEL_JOBS=8 PARALLEL_BATCH_SIZE=80000 ./run.sh |& tee run.out
 ```
+
+---
+
+ia
+valid, tripdetected,naps,laps
+http://localhost:8080/public/?vector=,http://localhost:3001/services/ia/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/tripdetected/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/naps/tiles/{z}/{x}/{y}.pbf
+
+naps, laps 
+http://localhost:8080/public/?vector=http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/naps/tiles/{z}/{x}/{y}.pbf

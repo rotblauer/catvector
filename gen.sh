@@ -106,7 +106,7 @@ export -f process
 #  None
 #######################################
 parallel_process() {
-  parallel -j "${PARALLEL_JOBS}" --pipe -N"${PARALLEL_BATCH_SIZE}" process {#} \
+  parallel -j "${PARALLEL_JOBS}" --pipe -N"${PARALLEL_BATCH_SIZE}" --blocksize 100706532 process {#} \
     >/dev/null
 }
 

@@ -191,7 +191,7 @@ func (t *LineStringBuilder) AddPointFeatureToLastLinestring(f *geojson.Feature) 
 	// Values which require the entire linestring to be calculated.
 	durationSeconds := timespan(t.LineStringFeatures[0], f).Round(time.Second).Seconds()
 	t.LineStringFeature.Properties["PointCount"] = len(t.LineStringFeatures)
-	t.LineStringFeature.Properties["Activity"] = activityModeNotUnknown(t.LineStringFeatures).String()
+	t.LineStringFeature.Properties["Activity"] = activityModeNotUnknownNorStationary(t.LineStringFeatures).String()
 	t.LineStringFeature.Properties["AverageAccuracy"] = toFixed(calculatedAverageAccuracy(t.LineStringFeatures), 0)
 	t.LineStringFeature.Properties["Duration"] = durationSeconds
 	t.LineStringFeature.Properties["DistanceAbsolute"] = toFixed(getAbsoluteDistance(t.LineStringFeatures), 2)
