@@ -106,7 +106,7 @@ export -f process
 #  None
 #######################################
 parallel_process() {
-  parallel -j "${PARALLEL_JOBS}" --pipe -L "${PARALLEL_BATCH_SIZE}" process {#} \
+  parallel -j "${PARALLEL_JOBS}" --pipe -N"${PARALLEL_BATCH_SIZE}" process {#} \
     >/dev/null
 }
 
