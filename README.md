@@ -1,8 +1,62 @@
 # catvector
 
-This project is primarily intended to develop a trip detection pipeline.
-Trips ("laps") are represented as linestrings, 
-and non-trips ("naps") can be represented as points.
+This project is primarily intended to develop a trip detection pipeline,
+where: trips ("laps") are represented as linestrings and non-trips ("naps") can be represented as points.
+
+How to differentiate laps from naps?
+What does this even mean?
+Does a lap begin when the cat ties their shoes? Upon leaving the front door?
+Both Android and iOS clients offer an "Activity: (Unknown|Stationary|Walking|Running|Biking|Driving)" annotation.
+Should laps differentiate themselves by activity? (Should a bicycle ride home from a run count as two laps or one?)
+ 
+Is pacing between the chair and the stove a "lap"?
+Laps between the bakery and produce departments in a large grocery store?  
+Will airplane trips be represented as laps?
+Are laps essentially `Speed > 0`, and naps then `Speed == 0`?   
+Should laps end, or should naps begin?
+
+Should they be exclusive? (They might use weighting or confidence scores instead; view could be decided by client.)
+... Or, Should we avoid the binary categorization and do scoring or tagging instead?
+
+This project so far is designed generally as a series of point skips and mutations
+which is applied to an io.Writer stream of newline-delimited points (properly: cat tracks).
+Sloppily, so far, some of these steps use backward-facing sets of data (cached tracks) - these are "stateful" because they need to remember "what happened",
+some use forward-facing data as well (becoming "eventers" that rely on non-serial reads/processes; they need to know what happens before _and_ after some cursor point in time and space) - like 
+`wangUrbanCanyonFilterStream`; other functions are atomic - they only require at a single cat track to operate on it.
+It might be good to structurally differentiate these kinds of functions,
+since speed, correctness, and elegance are all being explored here. 
+
+This design is tailored to data formats that are quickly serially readable and writing, but not necessarily/easily indexable or queryable.
+For CatTracks this usually means newline-delimited, gzipped files containing lists of GPS-annotated GeoJSON-encoded `Point`-type `Feature`s.
+These points may have many `properties`, like `"Accuracy": 5`, `"Speed": 1.42"`, or `"Name": "isaac"`,
+which must be handled with care owing to their legacy variations over time and clients.
+
+This project uses `zcat` widely.  
+
+The venerable `tippecanoe` is used finally to produce `.mbtiles` vector tile databases.
+It is important to note that tippecanoe is responsible for VERY IMPORTANT decisions about ultimate feature inclusion, mutations,
+simplifications, and other client-facing data. Server-side rendering here, people.
+
+Vector tiles can then be served to the client with a tile server.
+The client will then also be responsible for important decisions about what to show and how to show it on the map.
+Cat Tracks' state of the art uses the _MapLibre GL JS_ web client library regularly.
+
+Why a pipeline? What does the pipeline look like?
+
+Read
+Validate
+Clean
+Analyze
+Filter
+Transform
+Tee
+
+A "cleaning" step drops data from the pipeline, which can decrease resource demands like time and memory.
+Invalid data can be readily cleaned.
+A "validate" step asserts assumptions about the data.
+
+
+
 
 `cmdTripDetector` is the initial and, at the time of writing, the current state of the art.
 It was derived largely from some whitepapers I found on trip detection algorithms, and
@@ -15,6 +69,10 @@ time might be suggestive of "stops."
 Use [cattracks-explorer](https://github.com/rotblauer/cattracks-explorer) to visualize the generated data.
 - http://localhost:8080/public/?vector=http://localhost:3001/services/ia/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf
 - http://localhost:8080/public/?vector=http://localhost:3001/services/rye/valid/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf
+
+http://localhost:8080/public/?vector=http://localhost:3001/services/ia/laps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/ia/naps/tiles/{z}/{x}/{y}.pbf
+http://localhost:8080/public/?vector=http://localhost:3001/services/rye/laps/tiles/{z}/{x}/{y}.pbf,http://localhost:3001/services/rye/naps/tiles/{z}/{x}/{y}.pbf
+
 
 ---
 

@@ -37,7 +37,9 @@ postprocess() {
   [[ -d "${OUTPUT_ROOT_CAT_ONE}"/points ]] \
   && cat "${OUTPUT_ROOT_CAT_ONE}"/points/*.json.gz \
     | tee -a "${OUTPUT_ROOT_CAT_ONE}/points.json.gz" \
-    | zcat | ${script_dir}/runtpp.sh "${OUTPUT_ROOT_CAT_ONE}/naps.mbtiles"
+    | zcat \
+    | gfilter --match-all '#(properties.Accuracy<50)' \
+    | ${script_dir}/runtpp.sh "${OUTPUT_ROOT_CAT_ONE}/naps.mbtiles"
 
   # Map the VALID points. These are all points.
   # They are useful for comparing the laps and naps against the "raw" data.

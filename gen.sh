@@ -74,7 +74,7 @@ process() {
 
   #    | ${BUILD_TARGET} rkalman \
   echo >&2 "Processing category: ${CAT_ONE}, batch: ${batch_id}"
-  ${BUILD_TARGET} validate \
+  cat "${2}" | ${BUILD_TARGET} validate \
     | cattracks-names modify-json --modify.get='properties.Name' --modify.set='properties.Name' \
     | gfilter --match-all '#(properties.Name=='"${CAT_ONE}"'),#(properties.Accuracy<100)' \
     | intermediary_gzipping_to "${OUTPUT_ROOT_CAT_ONE}/valid/batch-${batch_id}.json.gz" \
@@ -106,7 +106,7 @@ export -f process
 #  None
 #######################################
 parallel_process() {
-  parallel -j "${PARALLEL_JOBS}" --pipe -N"${PARALLEL_BATCH_SIZE}" --blocksize 100706532 process {#} \
+  parallel -j "${PARALLEL_JOBS}" --pipe -N"${PARALLEL_BATCH_SIZE}" -L 1 --blocksize 100706532 --line-buffer --fifo process {#} {} \
     >/dev/null
 }
 
