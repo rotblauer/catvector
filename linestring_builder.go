@@ -37,10 +37,9 @@ func (t *LineStringBuilder) LastFeature() *geojson.Feature {
 }
 
 func (t *LineStringBuilder) Flush() {
-	if t.LineStringFeature != nil {
+	if t.LineStringFeature != nil && len(t.LineStringFeature.Geometry.(orb.LineString)) > 1 {
 		t.linestringsCh <- t.LineStringFeature
 	}
-	close(t.linestringsCh)
 }
 
 func (t *LineStringBuilder) AddFeatureToState(f *geojson.Feature) {
@@ -291,6 +290,13 @@ func (t *LineStringBuilder) AddPointFeature(f *geojson.Feature) {
 	}
 
 	if t.IsDiscontinuous(f) {
+		// Send the last linestring to the channel.
+		if t.LineStringFeature != nil && len(t.LineStringFeature.Geometry.(orb.LineString)) > 1 {
+			t.Flush()
+		} else {
+			// Otherwise the target linestring will be overwritten with the new feature
+			// without sending the last feature.
+		}
 		t.ResetState()
 		t.AddPointFeatureToNewLinestring(f)
 		return
